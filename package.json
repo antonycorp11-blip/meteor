@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.5",
-    "@fontsource/pixelify-sans": "^5.2.5",
+    "@fontsource/silkscreen": "^5.2.5",
     "matter-js": "^0.20.0"
   },
   "devDependencies": {

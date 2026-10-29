@@ -1,7 +1,9 @@
-import type { DeviceSave } from '../machines/types';
+import { DEVICES } from '../machines/catalog';
+import { LEGACY_DEVICE_TYPES, type DeviceSave } from '../machines/types';
 import { emptyStats, type ZoneStats } from '../progression/Goals';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+export const START_CREDITS = 20;
 const KEY = 'meteor-mill-save';
 const BACKUP_KEY = 'meteor-mill-save-backup';
 
@@ -19,7 +21,10 @@ export interface Settings {
 }
 
 export interface ZoneSave {
+  /** obsoleto desde a v3 (carteira global); mantido só para migração */
   credits: number;
+  /** o buraco negro desta zona já engoliu o mapa */
+  complete: boolean;
   devices: DeviceSave[];
   nextDeviceId: number;
   goals: string[];
@@ -33,10 +38,13 @@ export interface SaveData {
   currentZone: number;
   unlockedZone: number;
   campaignDone: boolean;
-  research: { earned: number; levels: Record<string, number> };
+  /** carteira global de créditos */
+  credits: number;
+  /** nós comprados na árvore estelar */
+  tree: { owned: string[] };
   settings: Settings;
   zones: Record<string, ZoneSave>;
-  tutorial: { extracted: boolean; grabbed: boolean; delivered: boolean; built: boolean };
+  tutorial: { extracted: boolean; grabbed: boolean; delivered: boolean; built: boolean; heat: boolean; tree: boolean };
 }
 
 export function defaultSettings(): Settings {
@@ -55,7 +63,7 @@ export function defaultSettings(): Settings {
 }
 
 export function emptyZoneSave(startCredits: number): ZoneSave {
-  return { credits: startCredits, devices: [], nextDeviceId: 1, goals: [], stats: emptyStats(), visited: false, converted: 0 };
+  return { credits: startCredits, complete: false, devices: [], nextDeviceId: 1, goals: [], stats: emptyStats(), visited: false, converted: 0 };
 }
 
 export function defaultSave(): SaveData {
@@ -64,10 +72,11 @@ export function defaultSave(): SaveData {
     currentZone: 1,
     unlockedZone: 1,
     campaignDone: false,
-    research: { earned: 0, levels: {} },
+    credits: START_CREDITS,
+    tree: { owned: ['core'] },
     settings: defaultSettings(),
     zones: {},
-    tutorial: { extracted: false, grabbed: false, delivered: false, built: false },
+    tutorial: { extracted: false, grabbed: false, delivered: false, built: false, heat: false, tree: false },
   };
 }
 
@@ -76,32 +85,47 @@ export function migrate(raw: unknown): SaveData {
   if (!raw || typeof raw !== 'object') return defaultSave();
   const data = raw as Record<string, unknown>;
   let version = typeof data.version === 'number' ? data.version : 1;
-  let d = { ...data } as Record<string, unknown>;
+  const d = { ...data } as Record<string, unknown>;
   if (version < 2) {
-    // v1 guardava pesquisa como número único e não tinha tutorial.
-    const r = d.research;
-    d.research = typeof r === 'number' ? { earned: r, levels: {} } : (r ?? { earned: 0, levels: {} });
+    // v1 não tinha tutorial.
     d.tutorial = { extracted: true, grabbed: true, delivered: true, built: true };
     version = 2;
   }
   const base = defaultSave();
+  const rawZones = (d.zones as Record<string, Partial<ZoneSave>>) ?? {};
+  let credits = typeof d.credits === 'number' ? Math.max(0, d.credits) : START_CREDITS;
+  if (version < 3) {
+    // v3: carteira global e árvore estelar. Somamos as carteiras das zonas e
+    // reembolsamos peças que deixaram de existir.
+    credits = START_CREDITS;
+    for (const z of Object.values(rawZones)) {
+      credits += Math.max(0, Number(z.credits) || 0);
+      for (const dv of z.devices ?? []) if (dv && LEGACY_DEVICE_TYPES.includes(dv.type as string)) credits += Math.max(0, Number(dv.paid) || 0);
+    }
+    d.tree = { owned: ['core'] };
+    version = 3;
+  }
+  const tree = (d.tree as SaveData['tree']) ?? base.tree;
   const out: SaveData = {
     ...base,
-    ...(d as Partial<SaveData>),
+    currentZone: Number(d.currentZone) || 1,
+    unlockedZone: Number(d.unlockedZone) || 1,
+    campaignDone: Boolean(d.campaignDone),
     version: SAVE_VERSION,
+    credits,
+    tree: { owned: Array.from(new Set(['core', ...(Array.isArray(tree.owned) ? tree.owned : [])])) },
     settings: { ...base.settings, ...((d.settings as Partial<Settings>) ?? {}) },
-    research: { ...base.research, ...((d.research as SaveData['research']) ?? {}) },
-    tutorial: { ...base.tutorial, ...((d.tutorial as SaveData['tutorial']) ?? {}) },
+    tutorial: { ...base.tutorial, ...((d.tutorial as Partial<SaveData['tutorial']>) ?? {}) },
     zones: {},
   };
-  const zones = (d.zones as Record<string, Partial<ZoneSave>>) ?? {};
-  for (const [k, z] of Object.entries(zones)) {
+  for (const [k, z] of Object.entries(rawZones)) {
     out.zones[k] = {
       ...emptyZoneSave(0),
       ...z,
-      credits: Math.max(0, Number(z.credits) || 0),
+      credits: 0,
+      complete: Boolean(z.complete),
       stats: { ...emptyStats(), ...(z.stats ?? {}) },
-      devices: Array.isArray(z.devices) ? z.devices.filter((q) => q && typeof q.type === 'string') : [],
+      devices: Array.isArray(z.devices) ? z.devices.filter((q) => q && typeof q.type === 'string' && q.type in DEVICES) : [],
     };
   }
   return out;

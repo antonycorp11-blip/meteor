@@ -86,7 +86,7 @@ export type SimEvents = {
   absorb: AbsorbInfo;
   lost: { frag: Fragment; reason: 'bounds' | 'rest' | 'shatter' };
   impact: { x: number; y: number; speed: number; mass: number; surface: ImpactSurface; type: FragmentTypeId };
-  device: { dev: Device; kind: 'bumper' | 'booster' | 'launch' | 'gate' | 'arm' | 'damper' | 'sensor' };
+  device: { dev: Device; kind: 'spring' | 'booster' | 'launch' | 'gate' | 'arm' | 'damper' | 'sensor' };
   shatter: { x: number; y: number; parent: Fragment; shards: Fragment[] };
   pulse: { x: number; y: number };
   grabBreak: { x: number; y: number };
@@ -126,6 +126,13 @@ export class Sim {
   lastManualExtract = -99;
   grab: { fragId: number; target: Vec } | null = null;
   generated = 0;
+  /** 0..1: quanto o buraco negro já cresceu (aumenta raio e força) */
+  holeGrowth = 0;
+  /** colapso final: o buraco negro engole tudo, sem oclusão */
+  collapsing = false;
+  /** direção em que a mineração automática bate (último clique manual) */
+  mineAim: Vec;
+  private autoMineTimer = 0;
   private queue: (() => void)[] = [];
   private g: number;
 
@@ -135,6 +142,7 @@ export class Sim {
     this.maxFragments = opts.maxFragments ?? Config.maxActiveFragments.desktop;
     this.rng = new Rng(opts.seed ?? zone.id * 7919 + 17);
     this.g = Config.gravity;
+    this.mineAim = zone.solutions[0]?.aim ?? { x: zone.asteroid.x + 100, y: zone.asteroid.y - 30 };
     this.engine = Engine.create({
       // Sem "sleeping": pilhas adormecidas travavam em encostas; o repouso
       // prolongado é tratado pela regra de recolhimento (Config.restRecycleSeconds).
@@ -174,6 +182,18 @@ export class Sim {
       restitution,
       plugin,
     });
+  }
+
+  holeAbsorb() {
+    return this.zone.blackHole.absorbRadius * (1 + 0.7 * this.holeGrowth);
+  }
+
+  holeAttract() {
+    return this.zone.blackHole.attractRadius * (1 + 0.45 * this.holeGrowth) * this.mods.holeRadiusMul;
+  }
+
+  holeStrength() {
+    return this.zone.blackHole.strength * (1 + 0.35 * this.holeGrowth);
   }
 
   // ------------------------------------------------------------------
@@ -291,7 +311,10 @@ export class Sim {
       out.push(frag);
       this.events.emit('extract', { frag, auto, x: p.x, y: p.y });
     }
-    if (!auto && out.length) this.lastManualExtract = this.time;
+    if (!auto && out.length) {
+      this.lastManualExtract = this.time;
+      if (target) this.mineAim = { ...target };
+    }
     return out;
   }
 
@@ -363,7 +386,7 @@ export class Sim {
     const h = this.zone.blackHole;
     for (const p of polys) {
       if (circleOverlapsPoly(a, a.r + 18, p)) return { ok: false, reason: 'Muito perto da fonte' };
-      if (circleOverlapsPoly(h, h.absorbRadius + 26, p)) return { ok: false, reason: 'Não pode tapar o buraco negro' };
+      if (circleOverlapsPoly(h, this.holeAbsorb() + 26, p)) return { ok: false, reason: 'Não pode tapar o buraco negro' };
       for (const nb of this.zone.noBuild) if (circleOverlapsPoly(nb, nb.r, p)) return { ok: false, reason: 'Área proibida' };
     }
     for (const d of this.devices.values()) {
@@ -373,10 +396,6 @@ export class Sim {
     }
     if (def.maxPerZone !== undefined && ignoreId < 0 && this.countType(type) >= def.maxPerZone)
       return { ok: false, reason: `Limite de ${def.maxPerZone} por zona` };
-    if (type === 'autoextractor') {
-      const d = Math.hypot(x - a.x, y - a.y) - a.r;
-      if (d > 70) return { ok: false, reason: 'Precisa ficar junto ao asteroide' };
-    }
     return { ok: true };
   }
 
@@ -545,25 +564,24 @@ export class Sim {
   private deviceContact(dev: Device, frag: Fragment, start: boolean) {
     const t = this.time;
     switch (dev.type) {
-      case 'bumper': {
-        if (!start) return;
+      case 'spring': {
+        // só arremessa quem encosta do lado da seta
+        const n = { x: Math.sin(dev.angle), y: -Math.cos(dev.angle) };
+        const side = (frag.body.position.x - dev.x) * n.x + (frag.body.position.y - dev.y) * n.y;
+        if (side < 0) return;
         const last = dev.rt.lastHit.get(frag.id) ?? -9;
-        if (t - last < 0.12) return;
+        if (t - last < 0.3) return;
         dev.rt.lastHit.set(frag.id, t);
         this.queue.push(() => {
           if (!frag.alive) return;
-          const p = frag.body.position;
-          const nx = p.x - dev.x;
-          const ny = p.y - dev.y;
-          const l = Math.hypot(nx, ny) || 1;
-          const n = { x: nx / l, y: ny / l };
           const vel = Body.getVelocity(frag.body);
-          const vn = vel.x * n.x + vel.y * n.y;
-          const kick = (dev.params.power ?? 4) * this.mods.bumperMul + Math.max(0, -vn) * 0.45;
-          const nv = { x: vel.x - n.x * Math.min(vn, 0) + n.x * kick, y: vel.y - n.y * Math.min(vn, 0) + n.y * kick };
-          Body.setVelocity(frag.body, nv);
+          const tx = { x: -n.y, y: n.x };
+          const vt = vel.x * tx.x + vel.y * tx.y;
+          const power = (dev.params.power ?? 8) * this.mods.springMul;
+          Body.setVelocity(frag.body, { x: n.x * power + tx.x * vt * 0.35, y: n.y * power + tx.y * vt * 0.35 });
+          Body.setAngularVelocity(frag.body, (this.rng.next() - 0.5) * 0.25);
           dev.rt.flash = 1;
-          this.events.emit('device', { dev, kind: 'bumper' });
+          this.events.emit('device', { dev, kind: 'spring' });
         });
         return;
       }
@@ -591,7 +609,7 @@ export class Sim {
           const d = { x: Math.cos(dev.angle), y: Math.sin(dev.angle) };
           const vel = Body.getVelocity(frag.body);
           const along = vel.x * d.x + vel.y * d.y;
-          const dv = ((dev.params.speed ?? 3) - along) * 0.16;
+          const dv = ((dev.params.speed ?? 3) * this.mods.conveyorMul - along) * 0.16;
           Body.setVelocity(frag.body, { x: vel.x + d.x * dv, y: vel.y + d.y * dv });
         });
         return;
@@ -683,6 +701,7 @@ export class Sim {
     this.time += dt;
     this.frame++;
     this.updateDevices(dt);
+    this.updateAutoMine(dt);
     this.postStep(dt);
   }
 
@@ -707,8 +726,13 @@ export class Sim {
       const dx = h.x - p.x;
       const dy = h.y - p.y;
       const d = Math.hypot(dx, dy);
-      if (d < h.attractRadius && d > 0.5 && lineOfSight(p, h, this.terrainShapes)) {
-        const k = h.strength * (0.3 + 0.7 * (1 - d / h.attractRadius));
+      const hr = this.holeAttract();
+      if (this.collapsing && d > 0.5) {
+        const k = 2600;
+        ax += (dx / d) * k;
+        ay += (dy / d) * k;
+      } else if (d < hr && d > 0.5 && lineOfSight(p, h, this.terrainShapes)) {
+        const k = this.holeStrength() * (0.3 + 0.7 * (1 - d / hr));
         const nx = dx / d;
         const ny = dy / d;
         ax += (nx - ny * Config.blackHoleSwirl) * k;
@@ -838,17 +862,6 @@ export class Sim {
         case 'arm':
           this.updateArm(dev, dt);
           break;
-        case 'autoextractor': {
-          if (!dev.enabled) break;
-          dev.rt.timer += dt;
-          const cad = 3.6 * this.mods.autoExtractCadenceMul;
-          if (dev.rt.timer >= cad) {
-            dev.rt.timer = 0;
-            const got = this.extract({ x: dev.x, y: dev.y }, true);
-            if (got.length) dev.rt.flash = 1;
-          }
-          break;
-        }
         case 'sensor': {
           if (!dev.enabled) break;
           const c = Math.cos(dev.angle);
@@ -886,6 +899,22 @@ export class Sim {
           break;
       }
     }
+  }
+
+  /** Mineração automática (árvore estelar): o asteroide solta pedras sozinho. */
+  private updateAutoMine(dt: number) {
+    const iv = this.mods.autoMineInterval;
+    if (!Number.isFinite(iv) || iv <= 0 || this.collapsing) return;
+    this.autoMineTimer += dt;
+    if (this.autoMineTimer >= iv) {
+      this.autoMineTimer = 0;
+      this.extract(this.mineAim, true);
+    }
+  }
+
+  autoMineProgress() {
+    const iv = this.mods.autoMineInterval;
+    return Number.isFinite(iv) ? Math.min(1, this.autoMineTimer / iv) : 0;
   }
 
   private updateLauncher(dev: Device, dt: number) {
@@ -1005,12 +1034,13 @@ export class Sim {
       }
       const p = b.position;
       const d = Math.hypot(p.x - h.x, p.y - h.y);
-      if (d < h.absorbRadius) {
-        if (lineOfSight(p, h, this.terrainShapes)) {
+      const ar = this.holeAbsorb();
+      if (d < ar) {
+        if (this.collapsing || lineOfSight(p, h, this.terrainShapes)) {
           toAbsorb.push(f);
           continue;
         }
-      } else if (d < h.absorbRadius * 2.4) {
+      } else if (d < ar * 2.4) {
         // amortece a órbita perto do centro
         const vel = Body.getVelocity(b);
         Body.setVelocity(b, { x: vel.x * 0.985, y: vel.y * 0.985 });

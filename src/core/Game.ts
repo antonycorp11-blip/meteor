@@ -9,18 +9,20 @@ import { TouchInput, type PointerInfo } from '../input/TouchInput';
 import { DEVICES, DEVICE_ORDER, defaultParams } from '../machines/catalog';
 import type { DeviceSave, DeviceType } from '../machines/types';
 import { FRAGMENT_TYPES } from '../physics/fragmentTypes';
-import { ZoneProgress } from '../progression/Goals';
-import { RESEARCH, buildMods, canBuy, spentOn } from '../progression/Research';
+import { ZoneProgress, type GoalProgress } from '../progression/Goals';
+import { TREE, buildMods, canBuyNode, nodeState, unlockedDevices } from '../progression/SkillTree';
 import { PAL } from '../render/palette';
-import { Renderer, type Floater, type Handle } from '../render/Renderer';
+import { Renderer, type CursorKind, type CursorState, type Floater, type Handle } from '../render/Renderer';
 import { SaveManager, type SaveData, type Settings, type ZoneSave } from '../save/SaveManager';
 import type { SimMods } from '../sim/mods';
 import { Sim, type Device } from '../sim/Sim';
+import { BuildDock } from '../ui/BuildDock';
 import { DevicePanel } from '../ui/DevicePanel';
-import type { GameApi, HudData, SelectedInfo, ShopItem, StatsInfo, ZoneCard } from '../ui/GameApi';
+import { installFrames } from '../ui/frame';
+import type { DockItem, GameApi, HudData, SelectedInfo, StatsInfo, ZoneCard } from '../ui/GameApi';
 import { Hud } from '../ui/Hud';
 import { Menus } from '../ui/Menus';
-import { Shop } from '../ui/Shop';
+import { TreeView } from '../ui/TreeView';
 import { ZONES, loadZone } from '../world/ZoneLoader';
 import type { ZoneData } from '../world/types';
 
@@ -54,6 +56,7 @@ type UndoEntry =
   | { kind: 'params'; id: number; from: Record<string, number>; enabled: boolean };
 
 const DEG = Math.PI / 180;
+const COLLAPSE_SECONDS = 4.5;
 
 export class Game implements GameApi {
   private saveMgr = new SaveManager();
@@ -62,15 +65,16 @@ export class Game implements GameApi {
   private music = new MusicEngine(this.bus);
   private sfx = new SfxEngine(this.bus);
   private hud: Hud;
-  private shop: Shop;
+  private dock: BuildDock;
   private panel: DevicePanel;
   private menus: Menus;
+  private tree: TreeView;
   private desktop: DesktopInput;
 
   zone!: ZoneData;
   sim!: Sim;
   progress!: ZoneProgress;
-  wallet!: Wallet;
+  readonly wallet: Wallet;
   private zsave!: ZoneSave;
   private mods: SimMods;
   private paused = false;
@@ -80,6 +84,9 @@ export class Game implements GameApi {
   private pointerWorld: Vec | null = null;
   private hoverAsteroid = false;
   private hoverFragment = -1;
+  private hoverDevice = false;
+  private cursor: CursorState = { x: 0, y: 0, kind: 'arrow', swing: 0, visible: false };
+  private cursorTouchUntil = 0;
   private floaters: Floater[] = [];
   private crack = 0;
   private shake = 0;
@@ -96,24 +103,30 @@ export class Game implements GameApi {
   private lastFailToast = -99;
   private isTouchDevice: boolean;
   private lastWasTouch = false;
-  private started = false;
-  private tutorialToastShown = false;
   private paramEditStart: Record<string, number> | null = null;
+  private collapseT = 0;
+  private visualGrowth = 0;
+  private treeHintShown = false;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
+    installFrames();
     this.renderer = new Renderer(canvas);
     this.isTouchDevice = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-    this.mods = buildMods(this.save.research.levels);
+    document.body.classList.toggle('touch', this.isTouchDevice);
+    this.mods = buildMods(this.save.tree.owned);
+    this.wallet = new Wallet(this.save.credits);
     this.hud = new Hud(this);
-    this.shop = new Shop(this);
+    this.dock = new BuildDock(this);
     this.panel = new DevicePanel(this);
     this.menus = new Menus(this);
-    uiRoot.append(this.hud.root, this.shop.root, this.panel.root, this.menus.root);
-    this.hud.onObjective = () => this.menus.goals(this.progress.goalProgress(), this.zone.hints);
-    this.hud.onResearch = () => this.menus.research();
+    this.tree = new TreeView(this);
+    uiRoot.append(this.hud.root, this.dock.root, this.panel.root, this.menus.root, this.tree.root);
+    this.hud.onTree = () => this.openTree();
+    this.hud.onChallenges = () => this.menus.goals();
     this.hud.onMenu = () => this.menus.title();
     this.hud.onStats = () => this.menus.stats();
-    this.shop.onToggle = () => this.updateInsets();
+    this.dock.onToggle = () => this.updateInsets();
+    this.tree.onClose = () => this.refreshDock();
 
     new TouchInput(
       canvas,
@@ -130,6 +143,7 @@ export class Game implements GameApi {
       },
       (css) => this.renderer.cssToBuffer(css.x, css.y),
     );
+    canvas.addEventListener('pointerleave', () => (this.cursor.visible = false));
     this.desktop = new DesktopInput(
       canvas,
       {
@@ -142,9 +156,10 @@ export class Game implements GameApi {
         overview: () => this.overview(),
         home: () => this.home(),
         toggleHud: () => this.hud.toggleHidden(),
+        tree: () => (this.tree.isOpen() ? this.tree.close() : this.openTree()),
         shopSlot: (i) => {
-          const t = this.shop.slot(i);
-          if (t && !this.menus.isOpen()) this.startGhost(t);
+          const t = this.dock.slot(i);
+          if (t && !this.menus.isOpen() && !this.tree.isOpen()) this.startGhost(t);
         },
         wheel: (dy, at, shift) => this.onWheel(dy, at, shift),
         panKeys: (dx, dy) => this.renderer.camera.panBy(dx, dy),
@@ -174,8 +189,7 @@ export class Game implements GameApi {
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.onResize(), 200));
 
-    if (window.innerHeight < 480) this.shop.setOpen(false); // celular em paisagem: mais espaço para o mapa
-    this.renderer.resize();
+    if (window.innerHeight < 480) this.dock.setOpen(false);
     this.openZoneInternal(Math.min(this.save.currentZone, this.save.unlockedZone), true);
     this.applySettings();
     this.onResize();
@@ -202,9 +216,8 @@ export class Game implements GameApi {
     const zone = loadZone(id);
     this.zone = zone;
     this.save.currentZone = id;
-    const zs = this.saveMgr.zone(id, zone.startCredits);
+    const zs = this.saveMgr.zone(id, 0);
     this.zsave = zs;
-    this.wallet = new Wallet(zs.credits);
     const maxF = this.isTouchDevice ? Config.maxActiveFragments.mobile : Config.maxActiveFragments.desktop;
     this.sim = new Sim(zone, { mods: this.mods, maxFragments: maxF });
     for (const d of zs.devices) {
@@ -213,6 +226,10 @@ export class Game implements GameApi {
     }
     this.sim.nextDeviceId = Math.max(this.sim.nextDeviceId, zs.nextDeviceId);
     this.progress = new ZoneProgress(zone, zs.stats, zs.goals);
+    this.progress.mods = this.mods;
+    this.visualGrowth = this.progress.growth();
+    this.sim.holeGrowth = this.visualGrowth;
+    this.collapseT = 0;
     this.wireSim();
     this.ghost = null;
     this.selectedId = -1;
@@ -226,12 +243,9 @@ export class Game implements GameApi {
     const fz = cam.fitZoom();
     const oc = cam.overviewCenter(fz);
     cam.snap(oc.x, oc.y, fz);
-    if (!initial) {
-      this.hud.banner(`${String(zone.id).padStart(2, '0')} ${zone.name.toUpperCase()}`, zone.intro);
-      if (!zs.visited) this.hud.toast(`Novas peças: ${zone.tools.map((t) => DEVICES[t].name).join(', ')}`, 'info', 4500);
-    }
+    if (!initial) this.hud.banner(`ZONA ${zone.id} · ${zone.name.toUpperCase()}`, zone.intro);
     zs.visited = true;
-    this.refreshShop();
+    this.refreshDock();
     this.persist();
   }
 
@@ -247,17 +261,18 @@ export class Game implements GameApi {
           this.save.tutorial.extracted = true;
           this.persist();
         }
-      }
-      ps.burst(e.x, e.y, this.save.settings.reduceParticles ? 3 : 8, ['#8A7A8E', '#FFB34B', '#FFE08A'], 50, 0.45, 60);
+        ps.burst(e.x, e.y, this.save.settings.reduceParticles ? 4 : 12, ['#ffe08a', '#ff9a3a', '#ffffff', '#8a7a8e'], 70, 0.45, 80);
+      } else ps.burst(e.x, e.y, 4, ['#ff9a3a', '#8a7a8e'], 40, 0.4, 60);
     });
     sim.events.on('absorb', (info) => {
-      const reward = this.progress.onAbsorb(info, sim.time);
+      const r = this.progress.onAbsorb(info, sim.time);
       this.renderer.forgetFragment(info.frag.id);
-      if (reward <= 0) return;
-      this.wallet.earn(reward);
+      if (r.credits <= 0) return;
+      this.wallet.earn(r.credits);
       const h = this.zone.blackHole;
-      const shown = reward >= 10 ? Math.round(reward) : Math.round(reward * 10) / 10;
-      this.floaters.push({ x: h.x, y: h.y - 14, text: `+${shown}`, color: info.auto ? PAL.core : '#BFE8F2', life: 1.2, max: 1.2 });
+      const shown = r.credits >= 10 ? Math.round(r.credits) : Math.round(r.credits * 10) / 10;
+      const hot = r.mult >= 1.5;
+      this.floaters.push({ x: h.x + (Math.random() - 0.5) * 20, y: h.y - 16, text: hot ? `+${shown} ×${r.mult.toFixed(1)}` : `+${shown}`, color: hot ? '#ffb070' : PAL.core, life: 1.2, max: 1.2 });
       if (this.floaters.length > 8) this.floaters.shift();
       const n = this.save.settings.reduceParticles ? 4 : 10;
       const col = FRAGMENT_TYPES[info.frag.type].colors;
@@ -283,8 +298,9 @@ export class Game implements GameApi {
     });
     sim.events.on('device', (e) => {
       switch (e.kind) {
-        case 'bumper':
+        case 'spring':
           this.sfx.bumper();
+          ps.burst(e.dev.x, e.dev.y - 4, 4, [PAL.cyan, '#E8FFFF'], 30, 0.25, 0);
           break;
         case 'booster':
           this.sfx.booster();
@@ -332,17 +348,17 @@ export class Game implements GameApi {
   openZone(id: number) {
     if (id > this.save.unlockedZone) return;
     this.menus.close();
-    this.started = true;
     if (id !== this.zone.id) this.openZoneInternal(id);
-    else this.hud.banner(`${String(id).padStart(2, '0')} ${this.zone.name.toUpperCase()}`, this.zone.intro);
+    else this.hud.banner(`ZONA ${id} · ${this.zone.name.toUpperCase()}`, this.zone.intro);
   }
 
   play() {
     this.menus.close();
-    if (!this.started) {
-      this.started = true;
-      this.hud.banner(`${String(this.zone.id).padStart(2, '0')} ${this.zone.name.toUpperCase()}`, this.zone.intro);
-    }
+    this.hud.banner(`ZONA ${this.zone.id} · ${this.zone.name.toUpperCase()}`, this.zone.intro);
+  }
+
+  reachedZone() {
+    return this.save.campaignDone ? 6 : this.save.unlockedZone;
   }
 
   // ------------------------------------------------------------------
@@ -351,8 +367,8 @@ export class Game implements GameApi {
 
   private persist(now = false) {
     if (!this.sim) return;
+    this.save.credits = this.wallet.credits;
     const zs = this.zsave;
-    zs.credits = this.wallet.credits;
     zs.devices = [...this.sim.devices.values()].map((d) => ({
       id: d.id,
       type: d.type,
@@ -388,6 +404,14 @@ export class Game implements GameApi {
       this.fpsFrames = 0;
       this.fpsTime = 0;
     }
+    this.cursor.swing = Math.max(0, this.cursor.swing - dt * 5);
+    if (this.lastWasTouch && this.realTime > this.cursorTouchUntil) this.cursor.visible = false;
+
+    if (this.menus.screen === 'title') {
+      this.renderer.renderTitle(this.realTime, dt, this.cursor);
+      return;
+    }
+
     const stepSec = Config.stepMs / 1000;
     if (!this.paused && !document.hidden) {
       this.acc += dt;
@@ -397,8 +421,15 @@ export class Game implements GameApi {
         this.acc -= stepSec;
         steps++;
       }
-      if (steps >= Config.maxCatchUpSteps) this.acc = 0; // sem espiral de catch-up
+      if (steps >= Config.maxCatchUpSteps) this.acc = 0;
+      this.progress.coolDown(dt);
     }
+    // crescimento visual suave do buraco negro
+    const target = this.progress.growth();
+    this.visualGrowth += (target - this.visualGrowth) * Math.min(1, dt * 2);
+    this.sim.holeGrowth = this.visualGrowth;
+    this.updateCollapse(dt);
+
     this.updateHold();
     this.desktop.update(dt);
     this.renderer.camera.update(dt);
@@ -414,14 +445,15 @@ export class Game implements GameApi {
       this.goalTimer = 0;
       this.checkGoals();
       this.music.setActivity(this.progress.massPerMinute() / 30);
+      this.tutorialNudges();
     }
     this.saveTimer += dt;
-    if (this.saveTimer > 15) {
+    if (this.saveTimer > 12) {
       this.saveTimer = 0;
       this.persist();
     }
     this.hudTimer += dt;
-    if (this.hudTimer > 0.2) {
+    if (this.hudTimer > 0.15) {
       this.hudTimer = 0;
       this.updateHud();
     }
@@ -429,6 +461,7 @@ export class Game implements GameApi {
       const f = this.sim.fragments.get(this.sim.grab.fragId);
       if (f) this.sfx.humUpdate(Math.min(1, dist(f.body.position, this.sim.grab.target) / this.sim.grabReach()));
     }
+    this.updateCursorKind();
 
     const sel = this.selectedDevice();
     const shakeAmt = this.save.settings.noShake ? 0 : this.shake;
@@ -438,7 +471,7 @@ export class Game implements GameApi {
         alpha: this.paused ? 1 : this.acc / stepSec,
         time: this.realTime,
         ghost: this.ghost,
-        selected: this.ghost?.editingId === sel?.id ? null : sel,
+        selected: this.ghost && sel && this.ghost.editingId === sel.id ? null : sel,
         handles: this.handles(),
         grabPointer: this.sim.grab ? this.sim.grab.target : null,
         floaters: this.floaters,
@@ -451,9 +484,53 @@ export class Game implements GameApi {
         hoverAsteroid: this.hoverAsteroid,
         hoverFragment: this.hoverFragment,
         hint: this.tutorialHint(),
+        heat: this.progress.heat.value / 100,
+        collapse: this.collapseT > 0 ? Math.min(1, this.collapseT / COLLAPSE_SECONDS) : 0,
+        cursor: this.cursor,
       },
       dt,
     );
+  }
+
+  /** Quando a barra enche, o buraco negro engole o mapa e a zona termina. */
+  private updateCollapse(dt: number) {
+    if (this.zsave.complete) return;
+    if (this.collapseT === 0 && this.progress.zoneComplete()) {
+      this.collapseT = 0.0001;
+      this.sim.collapsing = true;
+      this.ghost = null;
+      this.selectedId = -1;
+      this.sfx.goal();
+      this.hud.toast('O buraco negro está engolindo o mapa!', 'goal', 3500);
+      this.renderer.camera.overview();
+    }
+    if (this.collapseT > 0) {
+      this.collapseT += dt;
+      this.shake = Math.max(this.shake, Math.min(3, this.collapseT));
+      if (this.collapseT >= COLLAPSE_SECONDS) this.finishZone();
+    }
+  }
+
+  private finishZone() {
+    this.collapseT = 0;
+    this.sim.collapsing = false;
+    this.zsave.complete = true;
+    const zid = this.zone.id;
+    const bonus = Math.round(this.zone.growthTarget * 0.25);
+    this.wallet.earn(bonus);
+    let next: { id: number; name: string } | null = null;
+    let campaign = false;
+    if (zid < ZONES.length) {
+      this.save.unlockedZone = Math.max(this.save.unlockedZone, zid + 1);
+      const nz = loadZone(zid + 1);
+      next = { id: nz.id, name: nz.name };
+    } else if (!this.save.campaignDone) {
+      this.save.campaignDone = true;
+      campaign = true;
+    }
+    this.persist(true);
+    this.refreshDock();
+    this.menus.complete(this.zone.name, next, campaign, bonus);
   }
 
   private updateHold() {
@@ -461,7 +538,7 @@ export class Game implements GameApi {
     const cd = Config.extractCooldown * this.mods.extractCooldownMul * 1.6;
     if (this.realTime - this.ptr.last >= cd && !this.paused) {
       this.ptr.last = this.realTime;
-      this.sim.extract(this.ptr.world);
+      if (this.sim.extract(this.ptr.world).length) this.cursor.swing = 1;
     }
   }
 
@@ -472,8 +549,7 @@ export class Game implements GameApi {
     const pts: Vec[] = [];
     let x = f.body.position.x;
     let y = f.body.position.y;
-    const v = { ...f.body.velocity };
-    const vel = { x: v.x * 2, y: v.y * 2 }; // velocidade por quadro de 60 Hz (subpassos)
+    const vel = { x: f.body.velocity.x * 2, y: f.body.velocity.y * 2 };
     const g = Config.gravity / 3600;
     for (let i = 0; i < 40; i++) {
       vel.x += g * this.zone.gravity.x;
@@ -493,91 +569,100 @@ export class Game implements GameApi {
     if (!t.grabbed) {
       let newest: { x: number; y: number } | null = null;
       for (const f of this.sim.fragments.values()) newest = f.body.position;
-      if (newest) return { x: newest.x, y: newest.y - 24, text: this.isTouchDevice ? 'SEGURE O FRAGMENTO' : 'SEGURE E ARRASTE' };
-    }
-    if (t.grabbed && !t.built && this.wallet.credits >= 10 && !this.tutorialToastShown) {
-      this.tutorialToastShown = true;
-      this.hud.toast('Rochas não cedem. Compre uma Placa na loja e crie a rota sobre o fosso.', 'goal', 6000);
-      this.shop.setOpen(true);
+      if (newest) return { x: newest.x, y: newest.y - 24, text: this.isTouchDevice ? 'SEGURE A PEDRA' : 'SEGURE E ARRASTE' };
     }
     return null;
   }
 
+  private tutorialNudges() {
+    const t = this.save.tutorial;
+    if (!t.heat && this.progress.heat.value > 18) {
+      t.heat = true;
+      this.hud.showHeatTip();
+    }
+    if (!t.tree && !this.treeHintShown && this.wallet.credits >= 40) {
+      this.treeHintShown = true;
+      this.hud.toast('Abra a Árvore estelar (T) e libere a Mineração automática: o asteroide passa a trabalhar sozinho.', 'goal', 7000);
+    }
+  }
+
   private checkGoals() {
     const newly = this.progress.checkGoals();
-    if (!newly.length) return;
     for (const g of newly) {
-      this.save.research.earned += g.research;
-      this.hud.toast(`Objetivo cumprido: ${g.title} (+${g.research} ✦)`, 'goal', 4200);
+      this.wallet.earn(g.reward);
+      this.hud.toast(`Desafio cumprido: ${g.title} (+◆ ${g.reward})`, 'goal', 4200);
       this.sfx.goal();
     }
-    const zid = this.zone.id;
-    if (this.progress.zoneComplete() && this.save.unlockedZone <= zid && zid < ZONES.length) {
-      this.save.unlockedZone = zid + 1;
-      this.save.research.earned += 2;
-      const next = loadZone(zid + 1);
-      this.persist(true);
-      this.menus.complete(this.zone.name, { id: next.id, name: next.name }, false);
-    } else if (this.progress.zoneComplete() && zid === ZONES.length && !this.save.campaignDone) {
-      this.save.campaignDone = true;
-      this.save.research.earned += 2;
-      this.persist(true);
-      this.refreshShop();
-      this.menus.complete(this.zone.name, null, true);
-    }
-    this.persist();
+    if (newly.length) this.persist();
   }
 
   // ------------------------------------------------------------------
-  // HUD
+  // HUD e doca
   // ------------------------------------------------------------------
 
   private updateHud() {
     const goals = this.progress.goalProgress();
-    const next = goals.find((g) => !g.done && g.def.tier === 'basic') ?? goals.find((g) => !g.done && g.def.tier === 'engineering') ?? goals.find((g) => !g.done);
-    const eff = this.progress.efficiency();
+    const owned = new Set(this.save.tree.owned);
+    let affordable = 0;
+    for (const n of TREE) if (canBuyNode(owned, this.wallet.credits, this.reachedZone(), n.id).ok) affordable++;
+    const growth = this.progress.growth();
     const data: HudData = {
       zoneId: this.zone.id,
       zoneName: this.zone.name,
       credits: this.wallet.credits,
-      objective: next ? next.reqs.map((r) => r.label).join(' · ') : 'Zona dominada — otimize à vontade',
-      objectiveProgress: next ? next.reqs.reduce((s, r) => s + r.value, 0) / next.reqs.length : 1,
-      efficiency: eff.full ? `Efic. ${Math.round(eff.pct)}%` : `Efic. ${eff.considered}/${this.zone.efficiencyWindow}`,
+      growth,
+      growthLabel: this.zsave.complete ? 'BURACO NEGRO SUPERMASSIVO' : 'ALIMENTE O BURACO NEGRO',
+      heat: this.progress.heat.value / 100,
+      heatMult: this.progress.heat.mult(this.mods),
+      heatMax: this.mods.heatMaxMult,
       paused: this.paused,
-      combo: this.progress.combo,
-      research: this.researchAvailable(),
+      affordableNodes: affordable,
+      challengesDone: goals.filter((g) => g.done).length,
+      challengesTotal: goals.length,
       active: this.sim.fragments.size,
       maxActive: this.sim.maxFragments,
       fps: this.fps,
-      goals,
       ghostActive: !!this.ghost,
-      ghostValid: this.ghost?.valid ?? false,
+      ghostValid: (this.ghost?.valid ?? false) && (this.ghost ? this.ghost.editingId >= 0 || this.wallet.canAfford(this.ghost.price) : false),
       ghostReason: this.ghost ? this.ghostReason(this.ghost) : '',
       ghostPrice: this.ghost?.price ?? 0,
+      autoMine: Number.isFinite(this.mods.autoMineInterval) ? this.mods.autoMineInterval : 0,
     };
     this.hud.update(data, this.save.settings.showFps);
-    this.refreshShop();
+    this.refreshDock();
     this.panel.show(this.selectedInfo());
   }
 
   private ghostReason(g: GhostState) {
     if (!g.valid) return g.reason;
-    if (g.editingId < 0 && !this.wallet.canAfford(g.price)) return `Créditos insuficientes (◆ ${g.price})`;
+    if (g.editingId < 0 && !this.wallet.canAfford(g.price)) return `Faltam créditos (◆ ${g.price})`;
     return '';
   }
 
-  private refreshShop() {
-    this.shop.refresh(this.shopItems());
+  private refreshDock() {
+    this.dock.refresh(this.dockItems());
   }
 
-  shopItems(): ShopItem[] {
-    const out: ShopItem[] = [];
+  dockChanged() {
+    this.refreshDock();
+  }
+
+  dockItems(): DockItem[] {
+    const owned = new Set(this.save.tree.owned);
+    const unlocked = unlockedDevices(owned);
+    const out: DockItem[] = [];
+    let lockedShown = 0;
     for (const type of DEVICE_ORDER) {
       const def = DEVICES[type];
-      const unlocked = def.unlockZone <= this.zone.id || (def.unlockZone === 6 && this.save.campaignDone);
-      if (!unlocked) continue;
-      const price = this.priceOf(type);
-      out.push({ type, name: def.name, desc: def.desc, limit: def.limit, price, affordable: this.wallet.canAfford(price), isNew: this.zone.tools.includes(type) });
+      if (unlocked.has(type)) {
+        const price = this.priceOf(type);
+        out.push({ type, name: def.name, desc: def.desc, howTo: def.howTo, limit: def.limit, price, affordable: this.wallet.canAfford(price), locked: false });
+      } else {
+        const node = TREE.find((n) => n.unlock === type);
+        if (!node || nodeState(owned, node.id) !== 'available' || lockedShown >= 3) continue;
+        lockedShown++;
+        out.push({ type, name: def.name, desc: def.desc, howTo: def.howTo, limit: def.limit, price: 0, affordable: false, locked: true, nodeName: node.name, nodeCost: node.cost });
+      }
     }
     return out;
   }
@@ -589,24 +674,25 @@ export class Game implements GameApi {
   zoneCards(): ZoneCard[] {
     return ZONES.map((z) => {
       const zs = this.save.zones[String(z.id)];
-      const done = zs?.goals.length ?? 0;
-      const complete = z.goals.filter((g) => g.tier !== 'extra').every((g) => zs?.goals.includes(g.id));
+      const energy = z.id === this.zone.id ? this.progress.stats.energyFed : zs?.stats.energyFed ?? 0;
       return {
         id: z.id,
         name: z.name,
         subtitle: z.subtitle,
         unlocked: z.id <= this.save.unlockedZone,
-        complete: !!zs && complete,
-        goalsDone: done,
-        goalsTotal: z.goals.length,
-        credits: z.id === this.zone.id ? this.wallet.credits : zs?.credits ?? 0,
+        complete: !!zs?.complete,
+        growth: Math.min(1, energy / z.growthTarget),
         current: z.id === this.zone.id,
       };
     });
   }
 
-  researchAvailable(): number {
-    return this.save.research.earned - spentOn(this.save.research.levels);
+  challenges(): GoalProgress[] {
+    return this.progress.goalProgress();
+  }
+
+  zoneHints(): string[] {
+    return this.zone.hints;
   }
 
   stats(): StatsInfo {
@@ -622,6 +708,34 @@ export class Game implements GameApi {
       active: this.sim.fragments.size,
       devices: this.sim.devices.size,
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Árvore estelar
+  // ------------------------------------------------------------------
+
+  openTree() {
+    if (this.menus.isOpen()) this.menus.close();
+    this.cancelGhost();
+    this.save.tutorial.tree = true;
+    this.tree.open();
+  }
+
+  buyNode(id: string): boolean {
+    const owned = new Set(this.save.tree.owned);
+    const can = canBuyNode(owned, this.wallet.credits, this.reachedZone(), id);
+    if (!can.ok) return false;
+    const node = TREE.find((n) => n.id === id)!;
+    if (!this.wallet.spend(node.cost)) return false;
+    this.save.tree.owned.push(id);
+    this.mods = buildMods(this.save.tree.owned);
+    this.sim.mods = this.mods;
+    this.progress.mods = this.mods;
+    this.sfx.goal();
+    this.hud.toast(node.unlock ? `Nova peça: ${DEVICES[node.unlock].name}` : `Desbloqueado: ${node.name}`, 'good');
+    this.persist(true);
+    this.refreshDock();
+    return true;
   }
 
   // ------------------------------------------------------------------
@@ -641,14 +755,13 @@ export class Game implements GameApi {
       type: d.type,
       name: def.name,
       desc: def.desc,
-      limit: def.limit,
+      howTo: def.howTo,
       params: def.params,
       values: d.params,
       enabled: d.enabled,
       refund: refundFor(d.paid, this.mods.refundRate),
       manualGate: d.type === 'gate' && (d.params.mode ?? 0) === 1,
-      gateOpen: d.rt.manualOpen,
-      angleDeg: ((d.angle / DEG) % 360 + 360) % 360,
+      angleDeg: (((d.angle / DEG) % 360) + 360) % 360,
     };
   }
 
@@ -675,6 +788,7 @@ export class Game implements GameApi {
 
   startGhost(type: DeviceType, params?: Record<string, number>, angle = 0, at?: Vec) {
     if (this.menus.isOpen()) this.menus.close();
+    if (this.collapseT > 0) return;
     this.cancelGhost();
     const cam = this.renderer.camera;
     const pos = at ?? (!this.lastWasTouch && this.pointerWorld ? this.pointerWorld : { x: cam.x, y: cam.y });
@@ -682,7 +796,6 @@ export class Game implements GameApi {
     this.ghost = { type, x: p.x, y: p.y, angle, params: params ?? defaultParams(type), editingId: -1, valid: false, reason: '', price: 0 };
     this.revalidateGhost();
     if (!this.ghost.valid && (this.lastWasTouch || !at)) {
-      // procura um ponto livre próximo (espiral) para o fantasma nascer válido
       for (let r = 12; r <= 240 && !this.ghost.valid; r += 12) {
         for (let k = 0; k < 12; k++) {
           const a = (k / 12) * Math.PI * 2 - Math.PI / 2;
@@ -728,19 +841,18 @@ export class Game implements GameApi {
     const price = this.priceOf(g.type);
     if (!this.wallet.spend(price)) {
       this.sfx.invalid();
-      this.hud.toast(`Créditos insuficientes: ◆ ${price}`, 'bad');
+      this.hud.toast(`Faltam créditos: ◆ ${price}`, 'bad');
       return;
     }
     const dev = this.sim.addDevice({ type: g.type, x: g.x, y: g.y, angle: g.angle, params: { ...g.params }, enabled: true, paid: price });
     this.pushUndo({ kind: 'place', id: dev.id, paid: price });
     this.progress.onInstallationChanged();
     this.sfx.place();
-    this.renderer.particles.burst(g.x, g.y, 6, [PAL.cyan, PAL.steelLight], 30, 0.3, 0);
+    this.renderer.particles.burst(g.x, g.y, 8, [PAL.cyan, PAL.steelLight], 30, 0.3, 0);
     if (!this.save.tutorial.built) this.save.tutorial.built = true;
     this.persist();
-    if (keep) {
-      this.revalidateGhost();
-    } else {
+    if (keep) this.revalidateGhost();
+    else {
       this.ghost = null;
       this.selectedId = dev.id;
     }
@@ -799,8 +911,7 @@ export class Game implements GameApi {
   copySelected() {
     const d = this.selectedDevice();
     if (!d) return;
-    const off = rot({ x: 0, y: -24 }, 0);
-    this.startGhost(d.type, { ...d.params }, d.angle, { x: d.x + off.x + 16, y: d.y + off.y });
+    this.startGhost(d.type, { ...d.params }, d.angle, { x: d.x + 16, y: d.y - 24 });
   }
 
   sellSelected() {
@@ -821,7 +932,7 @@ export class Game implements GameApi {
 
   deselect() {
     this.selectedId = -1;
-    if (this.ghost?.editingId !== undefined && this.ghost.editingId >= 0) this.ghost = null;
+    if (this.ghost && this.ghost.editingId >= 0) this.ghost = null;
   }
 
   private pushUndo(e: UndoEntry) {
@@ -850,7 +961,7 @@ export class Game implements GameApi {
         if (d) {
           const v = this.sim.validatePlacement(d.type, e.from.x, e.from.y, e.from.angle, d.params, d.id);
           if (v.ok) this.sim.moveDevice(d, e.from.x, e.from.y, e.from.angle);
-          else this.hud.toast('Não é possível desfazer: posição antiga ocupada', 'bad');
+          else this.hud.toast('Não dá para desfazer: posição antiga ocupada', 'bad');
         }
         break;
       }
@@ -858,11 +969,11 @@ export class Game implements GameApi {
         const s = e.save;
         const v = this.sim.validatePlacement(s.type, s.x, s.y, s.angle, s.params);
         if (!v.ok) {
-          this.hud.toast('Não é possível desfazer: espaço ocupado', 'bad');
+          this.hud.toast('Não dá para desfazer: espaço ocupado', 'bad');
           break;
         }
         if (!this.wallet.spend(e.refund)) {
-          this.hud.toast('Créditos insuficientes para desfazer a venda', 'bad');
+          this.hud.toast('Faltam créditos para desfazer a venda', 'bad');
           this.undoStack.push(e);
           return;
         }
@@ -891,7 +1002,6 @@ export class Game implements GameApi {
     return this.renderer.camera.toWorld(p.b.x, p.b.y);
   }
 
-  /** Converte uma tolerância em px CSS para unidades de mundo. */
   private cssToWorld(px: number) {
     return (px * this.renderer.bufferPerCss()) / this.renderer.camera.zoom;
   }
@@ -907,19 +1017,38 @@ export class Game implements GameApi {
   }
 
   private hitHandle(w: Vec, touch: boolean): boolean {
-    const hs = this.handles();
     const tol = Math.max(7, this.cssToWorld(touch ? 24 : 12));
-    return hs.some((h) => dist(h, w) <= tol);
+    return this.handles().some((h) => dist(h, w) <= tol);
+  }
+
+  private moveCursor(p: PointerInfo) {
+    this.cursor.x = p.b.x;
+    this.cursor.y = p.b.y;
+    if (p.touch) {
+      this.cursorTouchUntil = this.realTime + 0.5;
+      this.cursor.visible = true;
+    } else this.cursor.visible = true;
+  }
+
+  private updateCursorKind() {
+    let k: CursorKind = 'arrow';
+    if (this.ptr.kind === 'grab') k = 'clawClosed';
+    else if (this.ghost) k = 'arrow';
+    else if (this.ptr.kind === 'extract' || this.hoverAsteroid) k = 'pick';
+    else if (this.hoverFragment >= 0) k = 'clawOpen';
+    else if (this.hoverDevice) k = 'hand';
+    if (this.lastWasTouch && k === 'arrow') k = 'none';
+    this.cursor.kind = k;
   }
 
   private onDown(p: PointerInfo) {
-    if (this.menus.isOpen()) return;
+    if (this.menus.isOpen() || this.tree.isOpen() || this.collapseT > 0) return;
     this.lastWasTouch = p.touch;
+    this.moveCursor(p);
     const w = this.worldOf(p);
     this.pointerWorld = w;
     const touchTol = p.touch ? this.cssToWorld(10) : 0;
 
-    // 1) fantasma em edição/compra
     if (this.ghost) {
       if (this.hitHandle(w, p.touch)) {
         this.ptr = { kind: 'ghostRotate', touch: p.touch };
@@ -927,7 +1056,6 @@ export class Game implements GameApi {
       }
       const near = dist(w, this.ghost) <= DEVICES[this.ghost.type].hitRadius + 4 + touchTol;
       if (near || p.touch) {
-        // no toque, tocar fora move o fantasma até ali
         const offset = near ? { x: this.ghost.x - w.x, y: this.ghost.y - w.y } : { x: 0, y: 0 };
         this.ptr = { kind: 'ghostDrag', offset, touch: p.touch };
         if (!near) {
@@ -938,12 +1066,10 @@ export class Game implements GameApi {
         }
         return;
       }
-      // PC: clique fora = construir aqui (o fantasma segue o mouse)
       this.confirmGhost(p.shift);
       return;
     }
 
-    // 2) peça selecionada: alça de giro / arrastar
     const sel = this.selectedDevice();
     if (sel) {
       if (this.hitHandle(w, p.touch)) {
@@ -958,15 +1084,14 @@ export class Game implements GameApi {
       }
     }
 
-    // 3) asteroide: extrair
     if (this.sim.isOnAsteroid(w)) {
-      this.sim.extract(w);
+      if (this.sim.extract(w).length) this.cursor.swing = 1;
+      this.shake = Math.max(this.shake, 0.6);
       this.ptr = { kind: 'extract', last: this.realTime, world: w };
       return;
     }
 
-    // 4) fragmento: segurar (PC imediato; toque com pressão longa)
-    const frag = this.sim.fragmentAt(w, p.touch ? Math.max(6, this.cssToWorld(14)) : Math.max(3, this.cssToWorld(5)));
+    const frag = this.sim.fragmentAt(w, p.touch ? Math.max(6, this.cssToWorld(14)) : Math.max(3, this.cssToWorld(6)));
     if (frag) {
       if (!p.touch) {
         this.beginGrab(frag.id, w);
@@ -982,7 +1107,6 @@ export class Game implements GameApi {
       return;
     }
 
-    // 5) peça: selecionar ao soltar
     const dev = this.sim.deviceAt(w, 2 + touchTol);
     this.ptr = { kind: 'pending', startB: p.b, target: dev ? 'device' : 'empty', fragId: -1, devId: dev?.id ?? -1, touch: p.touch, timer: 0 };
   }
@@ -1004,6 +1128,7 @@ export class Game implements GameApi {
   }
 
   private onMove(p: PointerInfo) {
+    this.moveCursor(p);
     const w = this.worldOf(p);
     this.pointerWorld = w;
     const st = this.ptr;
@@ -1023,16 +1148,14 @@ export class Game implements GameApi {
       case 'pending':
         if (Math.hypot(p.b.x - st.startB.x, p.b.y - st.startB.y) > moveTol) {
           if (st.timer) clearTimeout(st.timer);
-          this.ptr = { kind: 'pan', last: st.startB };
           this.renderer.camera.panBy(p.b.x - st.startB.x, p.b.y - st.startB.y);
-          (this.ptr as { last: Vec }).last = p.b;
+          this.ptr = { kind: 'pan', last: p.b };
         }
         break;
       case 'ghostDrag':
       case 'devDrag': {
         if (!this.ghost) break;
-        const off = st.kind === 'ghostDrag' ? st.offset : st.offset;
-        const s = this.snapPos({ x: w.x + off.x, y: w.y + off.y });
+        const s = this.snapPos({ x: w.x + st.offset.x, y: w.y + st.offset.y });
         this.ghost.x = s.x;
         this.ghost.y = s.y;
         this.revalidateGhost();
@@ -1051,8 +1174,9 @@ export class Game implements GameApi {
   }
 
   private onHover(p: PointerInfo) {
-    if (this.menus.isOpen()) return;
     this.lastWasTouch = false;
+    this.moveCursor(p);
+    if (this.menus.isOpen() || this.tree.isOpen()) return;
     const w = this.worldOf(p);
     this.pointerWorld = w;
     if (this.ghost && this.ghost.editingId < 0 && this.ptr.kind === 'none') {
@@ -1062,10 +1186,9 @@ export class Game implements GameApi {
       this.revalidateGhost();
     }
     this.hoverAsteroid = this.sim.isOnAsteroid(w);
-    const f = this.hoverAsteroid ? null : this.sim.fragmentAt(w, Math.max(3, this.cssToWorld(5)));
+    const f = this.hoverAsteroid ? null : this.sim.fragmentAt(w, Math.max(3, this.cssToWorld(6)));
     this.hoverFragment = f?.id ?? -1;
-    const canvas = this.renderer.canvas;
-    canvas.style.cursor = this.ghost ? 'crosshair' : this.hoverAsteroid ? 'pointer' : f ? 'grab' : this.sim.deviceAt(w, 2) ? 'pointer' : 'default';
+    this.hoverDevice = !f && !!this.sim.deviceAt(w, 2);
   }
 
   private onUp(p: PointerInfo) {
@@ -1089,11 +1212,7 @@ export class Game implements GameApi {
           const d = this.sim.devices.get(this.ghost.editingId);
           const moved = d && (Math.abs(d.x - this.ghost.x) > 0.01 || Math.abs(d.y - this.ghost.y) > 0.01 || Math.abs(d.angle - this.ghost.angle) > 1e-4);
           if (moved) this.confirmGhost();
-          else this.ghost = null;
-          if (this.ghost) {
-            // posição inválida: volta ao original
-            this.ghost = null;
-          }
+          this.ghost = null;
         }
         break;
       case 'ghostDrag':
@@ -1111,13 +1230,13 @@ export class Game implements GameApi {
       this.sfx.humStop();
     }
     if (st.kind === 'pending' && st.timer) clearTimeout(st.timer);
-    if ((st.kind === 'devDrag' || st.kind === 'devRotate') && this.ghost?.editingId !== undefined && this.ghost.editingId >= 0) this.ghost = null;
+    if ((st.kind === 'devDrag' || st.kind === 'devRotate') && this.ghost && this.ghost.editingId >= 0) this.ghost = null;
     if (st.kind === 'none' && this.ghost && !this.lastWasTouch) this.cancelGhost();
     this.ptr = { kind: 'none' };
   }
 
   private onWheel(dy: number, at: Vec, shift: boolean) {
-    if (this.menus.isOpen()) return;
+    if (this.menus.isOpen() || this.tree.isOpen()) return;
     if (this.ghost && (this.ptr.kind === 'none' || this.ptr.kind === 'ghostDrag' || this.ptr.kind === 'devDrag')) {
       this.rotate(Math.sign(dy) * (shift ? 1 : 5));
       return;
@@ -1126,8 +1245,12 @@ export class Game implements GameApi {
   }
 
   private escape() {
+    if (this.tree.isOpen()) {
+      this.tree.close();
+      return;
+    }
     if (this.menus.isOpen()) {
-      if (this.menus.screen !== 'title') this.menus.close();
+      if (this.menus.screen !== 'title' && this.menus.screen !== 'complete') this.menus.close();
       return;
     }
     if (this.ghost) {
@@ -1156,58 +1279,6 @@ export class Game implements GameApi {
   }
 
   // ------------------------------------------------------------------
-  // Pesquisa
-  // ------------------------------------------------------------------
-
-  buyResearch(id: string) {
-    const c = canBuy(this.save.research.levels, this.researchAvailable(), id);
-    if (!c.ok) return;
-    this.save.research.levels[id] = (this.save.research.levels[id] ?? 0) + 1;
-    this.applyResearch();
-    this.sfx.goal();
-    const node = RESEARCH.find((n) => n.id === id);
-    if (node) this.hud.toast(`Pesquisa: ${node.name}`, 'good');
-  }
-
-  respec() {
-    this.save.research.levels = {};
-    this.applyResearch();
-    this.hud.toast('Pesquisa redistribuída — todos os pontos devolvidos', 'good');
-  }
-
-  private applyResearch() {
-    this.mods = buildMods(this.save.research.levels);
-    this.sim.mods = this.mods;
-    this.persist();
-    this.refreshShop();
-  }
-
-  conversionInfo() {
-    if (!Config.crossZoneConversion.enabled) return [];
-    const c = Config.crossZoneConversion;
-    return ZONES.filter((z) => {
-      const zs = this.save.zones[String(z.id)];
-      return zs && z.goals.filter((g) => g.tier !== 'extra').every((g) => zs.goals.includes(g.id));
-    }).map((z) => {
-      const zs = this.save.zones[String(z.id)];
-      const credits = z.id === this.zone.id ? this.wallet.credits : zs.credits;
-      return { zoneId: z.id, name: z.name, credits, remaining: c.maxPointsPerZone - (zs.converted ?? 0), cost: c.creditsPerPoint };
-    });
-  }
-
-  convertCredits(zoneId: number) {
-    const info = this.conversionInfo().find((c) => c.zoneId === zoneId);
-    if (!info || info.remaining <= 0 || info.credits < info.cost) return;
-    const zs = this.save.zones[String(zoneId)];
-    if (zoneId === this.zone.id) {
-      if (!this.wallet.spend(info.cost)) return;
-    } else zs.credits -= info.cost;
-    zs.converted = (zs.converted ?? 0) + 1;
-    this.save.research.earned += 1;
-    this.persist(true);
-  }
-
-  // ------------------------------------------------------------------
   // Ajustes
   // ------------------------------------------------------------------
 
@@ -1224,12 +1295,13 @@ export class Game implements GameApi {
     document.documentElement.style.setProperty('--ui', String(s.uiScale));
     if (this.sim) this.updateInsets();
     document.body.classList.toggle('high-contrast', s.highContrast);
-    this.renderer.particles.setCap(s.reduceParticles ? 160 : 600);
+    this.renderer.particles.setCap(s.reduceParticles ? 180 : 700);
   }
 
   resetSave() {
     this.saveMgr.reset();
-    this.mods = buildMods({});
+    this.mods = buildMods(this.save.tree.owned);
+    this.wallet.credits = this.save.credits;
     this.sim.destroy();
     (this as unknown as { sim: Sim | undefined }).sim = undefined;
     this.openZoneInternal(1, true);
@@ -1241,12 +1313,13 @@ export class Game implements GameApi {
     this.sfx.ui();
   }
 
-  /** Informa à câmera quanto da tela o HUD e a loja ocupam. */
+  /** Informa à câmera quanto da tela o HUD e a doca ocupam. */
   updateInsets() {
     const compact = window.innerHeight < 480;
-    const top = (compact ? 92 : 66) * this.save.settings.uiScale;
-    const bottom = this.shop.isOpen() ? (compact ? 88 : 128) * this.save.settings.uiScale : 40;
-    this.renderer.setInsetsCss(top, bottom);
+    const u = this.save.settings.uiScale;
+    const top = (compact ? 70 : 92) * u;
+    const left = this.dock.isOpen() ? (compact ? 78 : 100) * u : 24;
+    this.renderer.setInsetsCss(top, 12, left);
     this.renderer.resize();
   }
 

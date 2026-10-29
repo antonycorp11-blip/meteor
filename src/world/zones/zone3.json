@@ -2,9 +2,9 @@
  "id": 3,
  "key": "basalto",
  "name": "Labirinto de Basalto",
- "subtitle": "Tr\u00eas desn\u00edveis e corredores em zigue-zague",
+ "subtitle": "Três desníveis e corredores em zigue-zague",
  "theme": "basalt",
- "intro": "Curvas, gargalos e po\u00e7os. Mantenha o fluxo vivo.",
+ "intro": "Curvas, gargalos e poços. Mantenha o fluxo vivo.",
  "width": 1280,
  "height": 720,
  "gravity": {
@@ -264,8 +264,7 @@
  "regions": [],
  "tools": [
   "fan",
-  "gate",
-  "conveyor"
+  "gate"
  ],
  "startCredits": 80,
  "priceMult": 1.2,
@@ -295,12 +294,12 @@
      "target": 320
     }
    ],
-   "research": 3
+   "reward": 180
   },
   {
    "id": "z3-eng",
    "tier": "engineering",
-   "title": "55% de efici\u00eancia (janela de 50) e 25 entregas autom\u00e1ticas",
+   "title": "55% de eficiência (janela de 50) e 25 entregas automáticas",
    "reqs": [
     {
      "kind": "efficiency",
@@ -311,7 +310,7 @@
      "count": 25
     }
    ],
-   "research": 3
+   "reward": 270
   },
   {
    "id": "z3-x1",
@@ -324,7 +323,7 @@
      "maxCluster": 12
     }
    ],
-   "research": 2
+   "reward": 180
   },
   {
    "id": "z3-x2",
@@ -336,18 +335,18 @@
      "count": 10
     }
    ],
-   "research": 2
+   "reward": 180
   }
  ],
  "hints": [
-  "Uma esteira aberta empurra, mas n\u00e3o prende: pedras podem saltar.",
+  "Uma esteira aberta empurra, mas não prende: pedras podem saltar.",
   "Uma portinhola alterna duas rotas e evita congestionamento.",
-  "Ventiladores perdem for\u00e7a em fragmentos densos."
+  "Ventiladores perdem força em fragmentos densos."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Percurso superior de placas sobre o po\u00e7o, queda at\u00e9 o bols\u00e3o e lan\u00e7ador sobre o pared\u00e3o em S",
+   "label": "Percurso superior de placas sobre o poço, queda até o bolsão e lançador sobre o paredão em S",
    "aim": {
     "x": 230,
     "y": 140
@@ -410,7 +409,7 @@
   },
   {
    "id": "B",
-   "label": "Percurso inferior: esteiras abertas tiram os detritos do po\u00e7o at\u00e9 o lan\u00e7ador",
+   "label": "Percurso inferior: esteiras abertas tiram os detritos do poço até o lançador",
    "aim": {
     "x": 230,
     "y": 140
@@ -482,9 +481,10 @@
   },
   {
    "id": "C",
-   "label": "Alternar as duas rotas com uma portinhola para evitar congestionamento no bols\u00e3o",
+   "label": "Alternar as duas rotas com uma portinhola para evitar congestionamento no bolsão",
    "manual": true,
    "devices": []
   }
- ]
+ ],
+ "growthTarget": 3600
 }

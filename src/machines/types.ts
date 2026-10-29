@@ -3,20 +3,22 @@ import type { Poly } from '../core/geometry';
 export type DeviceType =
   | 'plank'
   | 'ramp'
-  | 'deflector'
-  | 'bumper'
+  | 'funnel'
+  | 'spring'
+  | 'conveyor'
   | 'booster'
   | 'launcher'
-  | 'fan'
-  | 'gate'
-  | 'conveyor'
   | 'damper'
+  | 'gate'
+  | 'fan'
   | 'attractor'
   | 'repulsor'
   | 'arm'
   | 'lift'
-  | 'autoextractor'
   | 'sensor';
+
+/** Tipos removidos em versões antigas do save (são reembolsados na migração). */
+export const LEGACY_DEVICE_TYPES = ['deflector', 'bumper', 'autoextractor'];
 
 export interface ParamDef {
   key: string;
@@ -40,13 +42,13 @@ export interface FieldShape {
 export interface DeviceDef {
   type: DeviceType;
   name: string;
-  /** uma linha: o que faz de verdade */
+  /** uma linha, em linguagem simples: o que faz */
   desc: string;
+  /** como usar (dica prática) */
+  howTo: string;
   /** limitação que mantém o desafio */
   limit: string;
   cost: number;
-  /** zona em que a peça é desbloqueada (6 = pós-campanha) */
-  unlockZone: number;
   /** polígonos convexos sólidos, em coordenadas locais (ângulo 0) */
   solids: (params: Record<string, number>) => Poly[];
   /** índice dos sólidos que se movem (portinhola, braço) */

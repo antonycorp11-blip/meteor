@@ -1,16 +1,25 @@
 import { fmt, h, icon } from './dom';
 import type { GameApi, HudData } from './GameApi';
 
-/** HUD minimalista: créditos, uma linha de objetivo e botões recolhíveis. */
+/**
+ * HUD: créditos (esq.), barra de crescimento do buraco negro com o medidor de
+ * calor (centro), atalhos (dir.) e controles de câmera (canto inferior dir.).
+ */
 export class Hud {
   readonly root: HTMLElement;
   private credits: HTMLElement;
   private zoneName: HTMLElement;
-  private objective: HTMLElement;
-  private objBar: HTMLElement;
-  private eff: HTMLElement;
+  private growthFill: HTMLElement;
+  private growthPct: HTMLElement;
+  private growthLabel: HTMLElement;
+  private heatFill: HTMLElement;
+  private heatMult: HTMLElement;
+  private heatBox: HTMLElement;
+  private heatTip: HTMLElement;
+  private autoMine: HTMLElement;
   private pauseBtn: HTMLButtonElement;
-  private researchBadge: HTMLElement;
+  private treeBadge: HTMLElement;
+  private chalBadge: HTMLElement;
   private toasts: HTMLElement;
   private fps: HTMLElement;
   private ghostBar: HTMLElement;
@@ -18,79 +27,94 @@ export class Hud {
   private ghostOk: HTMLButtonElement;
   private hidden = false;
   private pausedTag: HTMLElement;
-  private combo: HTMLElement;
-  onObjective: () => void = () => {};
-  onResearch: () => void = () => {};
+  onTree: () => void = () => {};
+  onChallenges: () => void = () => {};
   onMenu: () => void = () => {};
   onStats: () => void = () => {};
 
   constructor(api: GameApi) {
-    const btn = (name: string, title: string, fn: () => void) =>
-      h('button', { class: 'icon-btn', title, 'aria-label': title, onclick: () => (api.uiSound(), fn()) }, icon(name));
+    const btn = (name: string, title: string, fn: () => void, extra?: HTMLElement, label?: string) =>
+      h(
+        'button',
+        { class: `px-btn icon ${label ? 'labeled' : ''}`, title, 'aria-label': title, onclick: () => (api.uiSound(), fn()) },
+        icon(name, 20),
+        label ? h('span', { class: 'lbl' }, label) : null,
+        extra ?? null,
+      );
 
     this.credits = h('span', { class: 'credits-val' }, '0');
-    this.zoneName = h('span', { class: 'zone-name' }, '');
-    this.combo = h('span', { class: 'combo' }, '');
-    const left = h(
+    this.zoneName = h('div', { class: 'zone-name' }, '');
+    const left = h('div', { class: 'hud-left px-panel' }, h('div', { class: 'credits' }, h('span', { class: 'gem' }), this.credits), this.zoneName);
+
+    // --- buraco negro + calor
+    this.growthFill = h('span', { class: 'grow-fill' });
+    this.growthPct = h('span', { class: 'grow-pct' }, '0%');
+    this.growthLabel = h('span', { class: 'grow-label' }, 'ALIMENTE O BURACO NEGRO');
+    this.heatFill = h('span', { class: 'heat-fill' });
+    this.heatMult = h('span', { class: 'heat-mult' }, '×1.0');
+    this.heatTip = h(
       'div',
-      { class: 'hud-left panel' },
-      h('div', { class: 'credits' }, h('span', { class: 'gem' }), this.credits, this.combo),
-      this.zoneName,
+      { class: 'heat-tip px-panel' },
+      h('b', {}, 'Calor'),
+      h('p', {}, 'Cada pedra entregue esquenta o buraco negro. Quanto mais quente, mais massa e créditos cada entrega rende (até o multiplicador máximo).'),
+      h('p', {}, 'Ele esfria sozinho: entregas uma a uma quase não aquecem; um fluxo contínuo de pedras (automação!) mantém o calor no máximo.'),
     );
-
-    this.objective = h('span', { class: 'obj-text' }, '');
-    this.objBar = h('span', { class: 'obj-bar-fill' });
-    this.eff = h('span', { class: 'obj-eff' }, '');
+    this.heatBox = h(
+      'button',
+      { class: 'heat', title: 'Calor — toque para entender', onclick: () => this.heatTip.classList.toggle('show') },
+      icon('flame', 18),
+      h('span', { class: 'heat-bar' }, this.heatFill),
+      this.heatMult,
+    );
+    this.autoMine = h('span', { class: 'auto-mine', title: 'Mineração automática' }, '');
     const center = h(
-      'button',
-      { class: 'hud-center panel', title: 'Objetivos da zona', onclick: () => this.onObjective() },
-      this.objective,
-      h('span', { class: 'obj-bar' }, this.objBar),
-      this.eff,
+      'div',
+      { class: 'hud-center px-panel' },
+      h('div', { class: 'grow-row' }, this.growthLabel, this.growthPct),
+      h('div', { class: 'grow-bar' }, this.growthFill),
+      h('div', { class: 'heat-row' }, this.heatBox, this.autoMine),
+      this.heatTip,
     );
 
-    this.pauseBtn = btn('pause', 'Pausar simulação (Espaço)', () => api.togglePause());
-    this.researchBadge = h('span', { class: 'badge' }, '');
-    const research = h(
-      'button',
-      { class: 'icon-btn', title: 'Pesquisa estelar', 'aria-label': 'Pesquisa estelar', onclick: () => (api.uiSound(), this.onResearch()) },
-      icon('star'),
-      this.researchBadge,
-    );
+    this.pauseBtn = btn('pause', 'Pausar (Espaço)', () => api.togglePause());
+    this.treeBadge = h('span', { class: 'badge' }, '');
+    this.chalBadge = h('span', { class: 'badge soft' }, '');
     const right = h(
       'div',
       { class: 'hud-right' },
+      btn('tree', 'Árvore estelar (T)', () => this.onTree(), this.treeBadge, 'Árvore'),
+      btn('trophy', 'Desafios', () => this.onChallenges(), this.chalBadge, 'Desafios'),
       this.pauseBtn,
+      btn('menu', 'Menu (Esc)', () => this.onMenu()),
+    );
+    const cam = h(
+      'div',
+      { class: 'hud-cam' },
       btn('overview', 'Visão geral (F)', () => api.overview()),
-      btn('home', 'Voltar à fonte (H)', () => api.home()),
+      btn('home', 'Ir até o asteroide (H)', () => api.home()),
       btn('undo', 'Desfazer construção (Ctrl+Z)', () => api.undo()),
       btn('stats', 'Estatísticas', () => this.onStats()),
-      research,
-      btn('eye', 'Esconder HUD (U)', () => this.toggleHidden()),
-      btn('menu', 'Menu', () => this.onMenu()),
+      btn('eye', 'Esconder interface (U)', () => this.toggleHidden()),
     );
 
-    this.pausedTag = h('div', { class: 'paused-tag' }, 'PAUSADO — edição livre');
+    this.pausedTag = h('div', { class: 'paused-tag' }, 'PAUSADO — construa com calma');
     this.toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
     this.fps = h('div', { class: 'fps' }, '');
 
     this.ghostInfo = h('div', { class: 'ghost-info' }, '');
-    this.ghostOk = h('button', { class: 'btn ok', 'aria-label': 'Confirmar posição', onclick: () => api.confirmGhost() }, icon('check'), ' Construir');
+    this.ghostOk = h('button', { class: 'px-btn green', 'aria-label': 'Construir aqui', onclick: () => api.confirmGhost() }, icon('check', 16), h('span', {}, 'Construir'));
     this.ghostBar = h(
       'div',
-      { class: 'ghost-bar panel' },
+      { class: 'ghost-bar px-panel' },
       this.ghostInfo,
-      h('div', { class: 'row' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Girar −15°', title: 'Girar −15° (Q)', onclick: () => api.rotate(-15) }, icon('rotl')),
-        h('button', { class: 'icon-btn', 'aria-label': 'Girar +15°', title: 'Girar +15° (E)', onclick: () => api.rotate(15) }, icon('rotr')),
-        this.ghostOk,
-        h('button', { class: 'icon-btn', 'aria-label': 'Cancelar', title: 'Cancelar (Esc)', onclick: () => api.cancelGhost() }, icon('close')),
-      ),
+      h('button', { class: 'px-btn icon', 'aria-label': 'Girar −15°', title: 'Girar −15° (Q)', onclick: () => api.rotate(-15) }, icon('rotl', 18)),
+      h('button', { class: 'px-btn icon', 'aria-label': 'Girar +15°', title: 'Girar +15° (E)', onclick: () => api.rotate(15) }, icon('rotr', 18)),
+      this.ghostOk,
+      h('button', { class: 'px-btn icon', 'aria-label': 'Cancelar', title: 'Cancelar (Esc)', onclick: () => api.cancelGhost() }, icon('close', 18)),
     );
 
-    const showBtn = h('button', { class: 'icon-btn show-hud', title: 'Mostrar HUD (U)', 'aria-label': 'Mostrar HUD', onclick: () => this.toggleHidden() }, icon('eye'));
-
-    this.root = h('div', { class: 'hud' }, left, center, right, this.pausedTag, this.toasts, this.fps, this.ghostBar, showBtn);
+    const showBtn = h('button', { class: 'px-btn icon show-hud', title: 'Mostrar interface (U)', 'aria-label': 'Mostrar interface', onclick: () => this.toggleHidden() }, icon('eye', 20));
+    this.root = h('div', { class: 'hud' }, left, center, right, cam, this.pausedTag, this.toasts, this.fps, this.ghostBar, showBtn);
   }
 
   toggleHidden() {
@@ -100,19 +124,26 @@ export class Hud {
 
   update(d: HudData, showFps: boolean) {
     this.credits.textContent = fmt(d.credits);
-    this.zoneName.textContent = `${String(d.zoneId).padStart(2, '0')} · ${d.zoneName}`;
-    this.combo.textContent = d.combo >= 3 ? ` ×${d.combo}` : '';
-    this.objective.textContent = d.objective;
-    this.objBar.style.width = `${Math.round(d.objectiveProgress * 100)}%`;
-    this.eff.textContent = d.efficiency;
-    this.pauseBtn.replaceChildren(icon(d.paused ? 'play' : 'pause'));
-    this.pauseBtn.title = d.paused ? 'Retomar simulação (Espaço)' : 'Pausar simulação (Espaço)';
+    this.zoneName.textContent = `Zona ${d.zoneId} · ${d.zoneName}`;
+    this.growthFill.style.width = `${(d.growth * 100).toFixed(1)}%`;
+    this.growthPct.textContent = `${Math.floor(d.growth * 100)}%`;
+    this.growthLabel.textContent = d.growthLabel;
+    const heatFrac = d.heat;
+    this.heatFill.style.width = `${Math.round(heatFrac * 100)}%`;
+    this.heatMult.textContent = `×${d.heatMult.toFixed(1)}`;
+    this.heatBox.classList.toggle('hot', heatFrac > 0.66);
+    this.heatBox.classList.toggle('warm', heatFrac > 0.25 && heatFrac <= 0.66);
+    this.heatBox.title = `Calor: multiplicador ×${d.heatMult.toFixed(2)} (máximo ×${d.heatMax}). Toque para entender.`;
+    this.autoMine.textContent = d.autoMine > 0 ? `Mineração auto: 1 pedra / ${d.autoMine.toFixed(1)} s` : '';
+    this.pauseBtn.replaceChildren(icon(d.paused ? 'play' : 'pause', 20));
+    this.pauseBtn.title = d.paused ? 'Retomar (Espaço)' : 'Pausar (Espaço)';
     this.pausedTag.style.display = d.paused ? 'block' : 'none';
-    this.researchBadge.textContent = d.research > 0 ? String(d.research) : '';
+    this.treeBadge.textContent = d.affordableNodes > 0 ? String(d.affordableNodes) : '';
+    this.chalBadge.textContent = `${d.challengesDone}/${d.challengesTotal}`;
     this.fps.textContent = showFps ? `${d.fps} fps · ${d.active}/${d.maxActive} corpos` : '';
     this.ghostBar.classList.toggle('show', d.ghostActive);
     if (d.ghostActive) {
-      this.ghostInfo.textContent = d.ghostValid ? `Custo ◆ ${d.ghostPrice}` : d.ghostReason;
+      this.ghostInfo.textContent = d.ghostValid ? `◆ ${d.ghostPrice}` : d.ghostReason;
       this.ghostInfo.classList.toggle('bad', !d.ghostValid);
       this.ghostOk.disabled = !d.ghostValid;
     }
@@ -126,7 +157,11 @@ export class Hud {
     setTimeout(() => el.remove(), ms + 500);
   }
 
-  /** Cartão curto de nova zona/conquista, sem cortar o jogo. */
+  showHeatTip() {
+    this.heatTip.classList.add('show');
+    setTimeout(() => this.heatTip.classList.remove('show'), 9000);
+  }
+
   banner(title: string, sub: string) {
     const el = h('div', { class: 'banner' }, h('div', { class: 'banner-title' }, title), h('div', { class: 'banner-sub' }, sub));
     this.root.append(el);

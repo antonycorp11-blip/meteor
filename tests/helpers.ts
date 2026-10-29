@@ -25,6 +25,7 @@ export function testZone(over: Partial<ZoneData> = {}): ZoneData {
     priceMult: 1,
     fragmentTable: [{ type: 'common', weight: 1 }],
     efficiencyWindow: 10,
+    growthTarget: 100,
     goals: [],
     hints: [],
     solutions: [],

@@ -2,6 +2,7 @@ import { Config } from '../core/Config';
 import { rewardFor } from '../economy/Economy';
 import type { FragmentTypeId } from '../physics/fragmentTypes';
 import type { AbsorbInfo } from '../sim/Sim';
+import { DEFAULT_MODS, type SimMods } from '../sim/mods';
 import type { GoalDef, GoalReq, ZoneData } from '../world/types';
 import { Ledger } from './Ledger';
 
@@ -21,6 +22,9 @@ export interface ZoneStats {
   fieldCurveCount: number;
   longestHandsOff: number;
   timePlayed: number;
+  /** energia já entregue ao buraco negro (massa × calor) */
+  energyFed: number;
+  bestHeatMult: number;
 }
 
 export function emptyStats(): ZoneStats {
@@ -40,6 +44,8 @@ export function emptyStats(): ZoneStats {
     fieldCurveCount: 0,
     longestHandsOff: 0,
     timePlayed: 0,
+    energyFed: 0,
+    bestHeatMult: 1,
   };
 }
 
@@ -53,6 +59,27 @@ export interface GoalProgress {
   def: GoalDef;
   done: boolean;
   reqs: ReqProgress[];
+}
+
+/**
+ * Calor: entregas seguidas aquecem o buraco negro; ele esfria sozinho.
+ * O multiplicador vai de ×1 (frio) até mods.heatMaxMult (no máximo).
+ * Fluxo contínuo (automação) mantém o calor alto; entregas isoladas não.
+ */
+export class Heat {
+  value = 0; // 0..100
+
+  deliver(mass: number, mods: SimMods = DEFAULT_MODS) {
+    this.value = Math.min(100, this.value + 7.5 * Math.sqrt(Math.max(0.2, mass)) * mods.heatGainMul);
+  }
+
+  update(dt: number, mods: SimMods = DEFAULT_MODS) {
+    this.value = Math.max(0, this.value - dt * (4 + this.value * 0.05) * mods.heatDecayMul);
+  }
+
+  mult(mods: SimMods = DEFAULT_MODS) {
+    return 1 + (this.value / 100) * (mods.heatMaxMult - 1);
+  }
 }
 
 /**
@@ -79,6 +106,8 @@ export class ZoneProgress {
   cluster = 0;
   deviceCount = 0;
   now = 0;
+  readonly heat = new Heat();
+  mods: SimMods = DEFAULT_MODS;
 
   constructor(zone: ZoneData, stats: ZoneStats, goalsDone: string[]) {
     this.zone = zone;
@@ -107,9 +136,9 @@ export class ZoneProgress {
     this.routeCounts.clear();
   }
 
-  /** Retorna os créditos ganhos (0 se a entrega já tinha sido paga). */
-  onAbsorb(info: AbsorbInfo, time: number): number {
-    if (!this.ledger.deliver(info.frag.id)) return 0;
+  /** Retorna créditos e energia ganhos (zero se a entrega já tinha sido paga). */
+  onAbsorb(info: AbsorbInfo, time: number): { credits: number; energy: number; mult: number } {
+    if (!this.ledger.deliver(info.frag.id)) return { credits: 0, energy: 0, mult: 1 };
     const s = this.stats;
     if (time - this.lastDelivery <= Config.comboWindow) this.combo++;
     else this.combo = 1;
@@ -130,9 +159,19 @@ export class ZoneProgress {
     for (const r of info.frag.regions) this.routeCounts.set(r, (this.routeCounts.get(r) ?? 0) + 1);
     this.recentDeliveries.push(time);
     this.typesSeen.set(info.frag.type === 'shard' ? 'glass' : info.frag.type, time);
-    const reward = rewardFor(info.value, this.combo, info.auto);
-    s.creditsEarned += reward;
-    return reward;
+    this.heat.deliver(info.mass, this.mods);
+    const mult = this.heat.mult(this.mods);
+    s.bestHeatMult = Math.max(s.bestHeatMult, mult);
+    const credits = rewardFor(info.value, 1, info.auto) * mult;
+    const energy = info.mass * mult;
+    s.creditsEarned += credits;
+    s.energyFed += energy;
+    return { credits, energy, mult };
+  }
+
+  /** 0..1: quanto o buraco negro já cresceu. */
+  growth() {
+    return Math.min(1, this.stats.energyFed / Math.max(1, this.zone.growthTarget));
   }
 
   onLost(id: number, reason: 'bounds' | 'rest' | 'shatter') {
@@ -147,6 +186,11 @@ export class ZoneProgress {
   }
 
   /** Chamado ~1×/s com métricas da simulação. */
+  /** Resfriamento contínuo do calor (chamar todo quadro). */
+  coolDown(dt: number) {
+    this.heat.update(dt, this.mods);
+  }
+
   tick(time: number, dt: number, cluster: number, deviceCount: number) {
     this.now = time;
     this.cluster = cluster;
@@ -255,7 +299,8 @@ export class ZoneProgress {
     return newly;
   }
 
+  /** A zona termina quando o buraco negro cresce até engolir o mapa. */
   zoneComplete(): boolean {
-    return this.zone.goals.filter((g) => g.tier !== 'extra').every((g) => this.goalsDone.has(g.id));
+    return this.stats.energyFed >= this.zone.growthTarget;
   }
 }

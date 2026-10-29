@@ -10,6 +10,7 @@ export interface DesktopActions {
   overview(): void;
   home(): void;
   toggleHud(): void;
+  tree(): void;
   shopSlot(i: number): void;
   wheel(deltaY: number, at: Vec, shift: boolean): void;
   panKeys(dx: number, dy: number): void;
@@ -81,8 +82,6 @@ export class DesktopInput {
         break;
       case 'Delete':
       case 'Backspace':
-      case 'r':
-      case 'R':
         this.a.sell();
         break;
       case 'c':
@@ -101,6 +100,10 @@ export class DesktopInput {
       case 'u':
       case 'U':
         this.a.toggleHud();
+        break;
+      case 't':
+      case 'T':
+        this.a.tree();
         break;
       default:
         if (k >= '1' && k <= '9') this.a.shopSlot(Number(k) - 1);

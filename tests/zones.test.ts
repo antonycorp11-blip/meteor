@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEVICES } from '../src/machines/catalog';
+import { TREE } from '../src/progression/SkillTree';
 import { Sim } from '../src/sim/Sim';
 import { ZONES, validateAllZones } from '../src/world/ZoneLoader';
 import { runSolution } from './helpers';
@@ -13,11 +14,13 @@ describe('engenharia de níveis', () => {
     expect(validateAllZones()).toEqual([]);
   });
 
-  it('cada zona tem objetivo básico, de engenharia e dois extras', () => {
+  it('cada zona tem meta de crescimento crescente e desafios com recompensa', () => {
+    let prev = 0;
     for (const z of ZONES) {
-      expect(z.goals.filter((g) => g.tier === 'basic')).toHaveLength(1);
-      expect(z.goals.filter((g) => g.tier === 'engineering')).toHaveLength(1);
-      expect(z.goals.filter((g) => g.tier === 'extra').length).toBeGreaterThanOrEqual(2);
+      expect(z.growthTarget).toBeGreaterThan(prev);
+      prev = z.growthTarget;
+      expect(z.goals.length).toBeGreaterThanOrEqual(3);
+      for (const g of z.goals) expect(g.reward).toBeGreaterThan(0);
     }
   });
 
@@ -25,14 +28,20 @@ describe('engenharia de níveis', () => {
     for (const z of ZONES) expect(z.solutions.filter((s) => !s.manual).length).toBeGreaterThanOrEqual(2);
   });
 
-  it('soluções usam apenas peças disponíveis até a zona', () => {
+  it('soluções usam peças que a árvore libera até aquela zona', () => {
     for (const z of ZONES)
-      for (const s of z.solutions) for (const d of s.devices) expect(DEVICES[d.type].unlockZone).toBeLessThanOrEqual(z.id);
+      for (const s of z.solutions)
+        for (const d of s.devices) {
+          const node = TREE.find((n) => n.unlock === d.type);
+          expect(node, d.type).toBeTruthy();
+          expect(node!.requiresZone ?? 1).toBeLessThanOrEqual(z.id);
+        }
   });
 
-  it('a zona 1 é resolvível só com peças básicas', () => {
-    const basics = new Set(['plank', 'ramp', 'deflector', 'bumper']);
+  it('a zona 1 é resolvível só com peças baratas do início', () => {
+    const basics = new Set(['plank', 'ramp', 'funnel', 'spring']);
     for (const s of ZONES[0].solutions) for (const d of s.devices) expect(basics.has(d.type)).toBe(true);
+    expect(DEVICES.plank.cost + DEVICES.funnel.cost + DEVICES.spring.cost).toBeLessThan(80);
   });
 
   for (const z of ZONES) {

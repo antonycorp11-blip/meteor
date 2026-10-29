@@ -2,9 +2,9 @@
  "id": 5,
  "key": "catedral",
  "name": "Catedral do Horizonte",
- "subtitle": "Tr\u00eas barreiras sucessivas",
+ "subtitle": "Três barreiras sucessivas",
  "theme": "cathedral",
- "intro": "Tr\u00eas barreiras naturais. Componha seus sistemas.",
+ "intro": "Três barreiras naturais. Componha seus sistemas.",
  "width": 1600,
  "height": 880,
  "gravity": {
@@ -282,8 +282,7 @@
  "regions": [],
  "tools": [
   "arm",
-  "lift",
-  "autoextractor"
+  "lift"
  ],
  "startCredits": 200,
  "priceMult": 1.5,
@@ -329,12 +328,12 @@
      "target": 1100
     }
    ],
-   "research": 3
+   "reward": 300
   },
   {
    "id": "z5-eng",
    "tier": "engineering",
-   "title": "70% de efici\u00eancia (janela de 75), 100 entregas autom\u00e1ticas e 90 s est\u00e1veis",
+   "title": "70% de eficiência (janela de 75), 100 entregas automáticas e 90 s estáveis",
    "reqs": [
     {
      "kind": "efficiency",
@@ -351,24 +350,24 @@
      "minRate": 20
     }
    ],
-   "research": 3
+   "reward": 450
   },
   {
    "id": "z5-x1",
    "tier": "extra",
-   "title": "50 entregas em sequ\u00eancia",
+   "title": "50 entregas em sequência",
    "reqs": [
     {
      "kind": "streak",
      "count": 50
     }
    ],
-   "research": 2
+   "reward": 300
   },
   {
    "id": "z5-x2",
    "tier": "extra",
-   "title": "70% de efici\u00eancia usando no m\u00e1ximo 12 pe\u00e7as",
+   "title": "70% de eficiência usando no máximo 12 peças",
    "reqs": [
     {
      "kind": "maxDevicesEff",
@@ -376,7 +375,7 @@
      "pct": 70
     }
    ],
-   "research": 2
+   "reward": 300
   },
   {
    "id": "z5-x3",
@@ -389,18 +388,18 @@
      "seconds": 30
     }
    ],
-   "research": 2
+   "reward": 300
   }
  ],
  "hints": [
-  "O elevador levita, mas n\u00e3o prende: algu\u00e9m precisa empurrar no topo.",
+  "O elevador levita, mas não prende: alguém precisa empurrar no topo.",
   "Pense em cadeias: cada barreira pede uma resposta diferente.",
-  "Um autoextrator s\u00f3 ajuda se o transporte j\u00e1 funciona."
+  "Um autoextrator só ajuda se o transporte já funciona."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Lan\u00e7ador no desfiladeiro (ritmo calmo), descida pelo plat\u00f4 e rampa curva antes da c\u00e2mara",
+   "label": "Lançador no desfiladeiro (ritmo calmo), descida pelo platô e rampa curva antes da câmara",
    "aim": {
     "x": 240,
     "y": 160
@@ -463,9 +462,10 @@
   },
   {
    "id": "C",
-   "label": "Rotas paralelas (lan\u00e7ador + elevador) com bra\u00e7o basculante e autoextrator para volume",
+   "label": "Rotas paralelas (lançador + elevador) com braço basculante e autoextrator para volume",
    "manual": true,
    "devices": []
   }
- ]
+ ],
+ "growthTarget": 13000
 }

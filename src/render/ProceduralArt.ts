@@ -173,17 +173,24 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
     }
   }
 
-  // --- sombreamento
+  // --- sombreamento: aglomerado de meteoros (esferas com crateras e veios)
   const dv = chamfer(vis, W, H, 1);
   const rock = theme.rock.map(hexToRgb);
   const line = hexToRgb(theme.rockLine);
   const rim = hexToRgb(highContrast ? '#e8e4ff' : theme.rim);
   const dust = hexToRgb(theme.dust);
+  const lava = [hexToRgb('#ff6a1e'), hexToRgb('#ffb34b'), hexToRgb('#fff0c0')];
   const out = new Uint8ClampedArray(W * H * 4);
-  const S = 15; // tamanho médio dos blocos
+  const glow = makeCanvas(Math.ceil(W / GLOW_SCALE), Math.ceil(H / GLOW_SCALE));
+  const gctx = glow.getContext('2d')!;
+  const glowPts: Vec[] = [];
+  const S = 30; // tamanho médio de cada meteoro
+  const L3 = { x: -0.45, y: -0.65, z: 0.6 };
   const seedAt = (cx: number, cy: number) => ({
-    x: (cx + 0.15 + hash2(cx, cy, seed + 11) * 0.7) * S,
-    y: (cy + 0.15 + hash2(cx, cy, seed + 12) * 0.7) * S,
+    x: (cx + 0.2 + hash2(cx, cy, seed + 11) * 0.6) * S,
+    y: (cy + 0.2 + hash2(cx, cy, seed + 12) * 0.6) * S,
+    r: S * (0.55 + hash2(cx, cy, seed + 13) * 0.3),
+    id: cx * 7919 + cy,
   });
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -193,7 +200,6 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
       let c: number[];
       if (d < 1.2) c = line;
       else {
-        // normal aproximada perto da borda
         let facing = 0;
         let oy = 0;
         if (d < 7) {
@@ -203,37 +209,61 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
           facing = (nx / l) * LIGHT.x + (ny / l) * LIGHT.y;
           oy = ny / l;
         }
-        // voronoi: blocos de pedra
         const gx = Math.floor(x / S);
         const gy = Math.floor(y / S);
         let d1 = 1e9;
         let d2 = 1e9;
-        let best = { x: 0, y: 0 };
-        let bid = 0;
+        let best = seedAt(gx, gy);
         for (let j = -1; j <= 1; j++)
           for (let k = -1; k <= 1; k++) {
-            const s = seedAt(gx + k, gy + j);
-            const dd = (x - s.x) ** 2 + (y - s.y) ** 2;
+            const sd = seedAt(gx + k, gy + j);
+            // distância normalizada pelo raio: meteoros maiores "vencem"
+            const dd = Math.hypot(x - sd.x, y - sd.y) / sd.r;
             if (dd < d1) {
               d2 = d1;
               d1 = dd;
-              best = s;
-              bid = (gx + k) * 7919 + (gy + j);
+              best = sd;
             } else if (dd < d2) d2 = dd;
           }
-        const edge = Math.sqrt(d2) - Math.sqrt(d1);
-        const cellShade = hash2(bid, 3, seed) * 0.3 - 0.12;
-        const inLight = ((x - best.x) * LIGHT.x + (y - best.y) * LIGHT.y) / S;
-        const depth = Math.min(1, d / 70);
-        let t = 0.62 + cellShade + inLight * 0.35 - depth * 0.32 + (fbm(x / 70, y / 55, seed + 50, 3) - 0.5) * 0.45 + (bayer(x, y) - 0.5) * 0.12;
-        if (edge < 1.3) t -= 0.3;
-        else if (edge < 2.4 && inLight > 0) t += 0.08;
-        if (d < 5 && facing > 0.3) t += 0.35 * (1 - d / 5) + 0.1;
-        if (d < 6 && facing < -0.35) t -= 0.25;
+        const crevice = (d2 - d1) * best.r < 2.2;
+        // esfera: normal a partir do centro do meteoro
+        const ux = (x - best.x) / best.r;
+        const uy = (y - best.y) / best.r;
+        const uu = Math.min(1, ux * ux + uy * uy);
+        const nz = Math.sqrt(1 - uu);
+        let lam = ux * L3.x + uy * L3.y + nz * L3.z;
+        // crateras pequenas dentro de cada meteoro
+        for (let q = 0; q < 2; q++) {
+          if (hash2(best.id, q, seed + 40) < 0.45) continue;
+          const ca = hash2(best.id, q, seed + 41) * Math.PI * 2;
+          const cd = hash2(best.id, q, seed + 42) * 0.55 * best.r;
+          const cr = best.r * (0.16 + hash2(best.id, q, seed + 43) * 0.14);
+          const cx = best.x + Math.cos(ca) * cd;
+          const cy = best.y + Math.sin(ca) * cd;
+          const dd = Math.hypot(x - cx, y - cy);
+          if (dd < cr) {
+            const inner = ((x - cx) * -LIGHT.x + (y - cy) * -LIGHT.y) / cr;
+            lam = inner > 0.3 ? lam + 0.25 : lam - 0.35;
+          } else if (dd < cr + 1.2) lam += 0.12;
+        }
+        const depth = Math.min(1, d / 80);
+        let t = 0.3 + lam * 0.55 + (hash2(best.id, 3, seed) - 0.5) * 0.16 - depth * 0.22 + (fbm(x / 60, y / 50, seed + 50, 2) - 0.5) * 0.25;
+        t += (bayer(x, y) - 0.5) * 0.1;
+        if (crevice) t -= 0.35;
+        if (d < 5 && facing > 0.3) t += 0.3 * (1 - d / 5) + 0.08;
+        if (d < 6 && facing < -0.35) t -= 0.2;
         const idx = Math.max(0, Math.min(5, Math.floor(t * 6)));
         c = rock[idx];
         if (d < 3.2 && facing > 0.45) c = rim;
         if (d < 2.6 && oy < -0.75 && hash2(x >> 1, y, seed + 21) > 0.35) c = dust;
+        // veios de magma em alguns meteoros
+        if (!crevice && d > 4 && hash2(best.id, 9, seed) > 0.9) {
+          const v = Math.abs(fbm(x / 9 + best.id, y / 9, seed + 60, 3) - 0.5);
+          if (v < 0.014) {
+            c = lava[v < 0.008 ? 2 : 1];
+            if ((x + y * 3) % 23 === 0) glowPts.push({ x, y });
+          } else if (v < 0.024) c = lava[0];
+        }
       }
       const o = i * 4;
       out[o] = c[0];
@@ -244,14 +274,23 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
   }
   img.data.set(out);
   ctx.putImageData(img, 0, 0);
+  const lavaGlow = (px: number, py: number, color: string, r: number, a: number) => {
+    const gx = px / GLOW_SCALE;
+    const gy = py / GLOW_SCALE;
+    const grad = gctx.createRadialGradient(gx, gy, 0, gx, gy, r);
+    const [rr, gg, bb] = hexToRgb(color);
+    grad.addColorStop(0, `rgba(${rr},${gg},${bb},${a})`);
+    grad.addColorStop(1, `rgba(${rr},${gg},${bb},0)`);
+    gctx.fillStyle = grad;
+    gctx.fillRect(gx - r, gy - r, r * 2, r * 2);
+  };
+  for (const p of glowPts) lavaGlow(p.x, p.y, '#ff6a1e', 4, 0.22);
 
-  // --- cristais embutidos (com brilho)
-  const glow = makeCanvas(Math.ceil(W / GLOW_SCALE), Math.ceil(H / GLOW_SCALE));
-  const gctx = glow.getContext('2d')!;
+  // --- poucos cristais embutidos (com brilho)
   const rng = new Rng(seed + 77);
   let area = 0;
   for (let i = 0; i < W * H; i++) area += vis[i];
-  const nClusters = Math.floor(area / 16000);
+  const nClusters = Math.floor(area / 26000);
   const setPx = (px: number, py: number, col: string) => {
     if (px < 0 || py < 0 || px >= W || py >= H) return;
     ctx.fillStyle = col;
@@ -270,14 +309,7 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
     for (let k = 0; k < n; k++) {
       drawCrystal(setPx, x + rng.int(-4, 4), y + rng.int(-1, 3), rng.int(4, 8), rng.int(2, 4), rng.range(-0.3, 0.3), theme.crystal);
     }
-    const gx = x / GLOW_SCALE;
-    const gy = y / GLOW_SCALE;
-    const grad = gctx.createRadialGradient(gx, gy, 0, gx, gy, 7);
-    const [r, g, b] = hexToRgb(theme.crystal[2]);
-    grad.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-    gctx.fillStyle = grad;
-    gctx.fillRect(gx - 8, gy - 8, 16, 16);
+    lavaGlow(x, y, theme.crystal[2], 7, 0.4);
   }
   return { tex: canvas, glow };
 }
@@ -588,28 +620,31 @@ export function deviceArt(type: DeviceType): DeviceArt {
       art = { base: finish(g), lights: [] };
       break;
     }
-    case 'deflector': {
-      const g = gridFor(solids, 4);
-      g.poly(solids[0], metal(solids[0]));
-      g.line(-16, -2, 16, -2, '#d8ecff');
-      g.circle(0, 0, 3.4, BRASS[2]);
-      g.circle(0, 0, 1.6, PAL.amber);
-      art = { base: finish(g), lights: [{ x: 0, y: 0, color: PAL.amber, size: 10 }] };
+    case 'funnel': {
+      const g = gridFor(solids);
+      for (const w of solids) g.poly(w, metal(w, BRASS));
+      g.line(-37, -18, -13, 8, BRASS[5]);
+      g.line(37, -18, 13, 8, BRASS[5]);
+      g.set(g.ox - 11, g.oy + 7, PAL.core);
+      g.set(g.ox + 11, g.oy + 7, PAL.core);
+      art = { base: finish(g), lights: [{ x: 0, y: 6, color: PAL.amber, size: 12 }] };
       break;
     }
-    case 'bumper': {
+    case 'spring': {
+      // plataforma sobre molas (mesma altura do corpo físico: y −4..4)
       const mk = (lit: boolean) => {
         const g = gridFor(solids);
-        g.circle(0, 0, 9, (x, y) => {
-          const d = Math.hypot(x, y);
-          const l = (x * LIGHT.x + y * LIGHT.y) / 9;
-          if (d > 7.4) return lit ? '#e8ffff' : l > 0.2 ? '#9ff0fa' : PAL.cyan;
-          if (d > 5) return l > 0.1 ? METAL[4] : METAL[2];
-          return lit ? '#fff4c8' : l > 0 ? PAL.core : PAL.amber;
-        });
+        g.rect(-21, 1, 42, 3, METAL[1]);
+        g.line(-21, 1, 20, 1, METAL[3]);
+        for (const cx of [-13, -4, 5, 14]) {
+          g.line(cx - 2, 0, cx + 2, -1, METAL[4]);
+          g.line(cx - 2, -1, cx + 2, 0, METAL[2]);
+        }
+        g.rect(-21, -4, 42, 2, lit ? '#e8ffff' : PAL.cyan);
+        g.line(-21, -4, 20, -4, lit ? '#ffffff' : '#bff6ff');
         return finish(g);
       };
-      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.cyan, size: 22 }] };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: -3, color: PAL.cyan, size: 22 }] };
       break;
     }
     case 'booster': {
@@ -724,18 +759,6 @@ export function deviceArt(type: DeviceType): DeviceArt {
       art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: -6, color: PAL.cyan, size: 30 }] };
       break;
     }
-    case 'autoextractor': {
-      const mk = (lit: boolean) => {
-        const g = gridFor(solids);
-        g.poly(solids[0], metal(solids[0], BRASS));
-        g.rect(-6, -6, 12, 12, METAL[1]);
-        g.rect(-3, -3, 6, 6, lit ? '#fff4c8' : PAL.amber);
-        g.line(-9, -9, -6, -6, PAL.cyan);
-        return finish(g);
-      };
-      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.amber, size: 16 }] };
-      break;
-    }
     case 'sensor': {
       const h = SENSOR_SIZE / 2;
       const mk = (lit: boolean) => {
@@ -792,19 +815,35 @@ export interface FarRock {
   x: number;
   y: number;
   par: number;
+  /** deriva lenta (px/s) */
+  vx: number;
+  vy: number;
+}
+
+export interface AnimatedPlanet {
+  frames: Sprite[];
+  x: number;
+  y: number;
+  par: number;
+  r: number;
+  moon: Sprite | null;
+  moonOrbit: number;
+  moonSpeed: number;
+  /** período de rotação (s) */
+  spin: number;
 }
 
 export interface BackgroundArt {
   far: HTMLCanvasElement;
   near: HTMLCanvasElement;
-  twinkles: { x: number; y: number; c: string; p: number }[];
+  twinkles: { x: number; y: number; c: string; p: number; s: number }[];
   nebula: HTMLCanvasElement;
   nebulaScale: number;
-  galaxy: Sprite;
+  galaxy: Sprite[];
   galaxyPos: Vec;
-  planets: { sprite: Sprite; x: number; y: number; par: number }[];
+  planets: AnimatedPlanet[];
   farRocks: FarRock[];
-  frameRocks: FarRock[];
+  meteorColors: string[];
 }
 
 function starTile(size: number, density: number, colors: string[], seed: number, big: boolean) {
@@ -824,7 +863,8 @@ function starTile(size: number, density: number, colors: string[], seed: number,
   return g.toSprite().canvas;
 }
 
-function planet(r: number, cols: [string, string, string], ring: boolean, seed: number): Sprite {
+/** Planeta com textura que gira (longitude deslocada por `lon`). */
+function planet(r: number, cols: [string, string, string], ring: boolean, seed: number, lon: number): Sprite {
   const pad = ring ? Math.ceil(r * 1.0) : 2;
   const g = new PixelGrid(r * 2 + pad * 2, r * 2 + pad * 2, r + pad, r + pad);
   const ringPts: { x: number; y: number; front: boolean }[] = [];
@@ -833,7 +873,7 @@ function planet(r: number, cols: [string, string, string], ring: boolean, seed: 
       for (const rr of [1.55, 1.65, 1.78]) {
         const x = Math.cos(a) * r * rr;
         const y = Math.sin(a) * r * 0.36 * rr;
-        ringPts.push({ x: x, y: y - x * 0.18, front: Math.sin(a) > 0 });
+        ringPts.push({ x, y: y - x * 0.18, front: Math.sin(a) > 0 });
       }
     }
     for (const p of ringPts) if (!p.front) g.set(Math.floor(p.x + g.ox), Math.floor(p.y + g.oy), mix(cols[0], '#ffffff', 0.2), 160);
@@ -841,8 +881,10 @@ function planet(r: number, cols: [string, string, string], ring: boolean, seed: 
   g.circle(0, 0, r, (x, y) => {
     const nz = Math.sqrt(Math.max(0, 1 - (x * x + y * y) / (r * r)));
     const l = (x / r) * -0.7 + (y / r) * -0.45 + nz * 0.55;
-    const band = valueNoise(0.5, y / (r * 0.18) + 10, seed) * 0.5 + valueNoise(x / r, y / (r * 0.3), seed + 2) * 0.2;
-    const t = l * 0.75 + band * 0.4 + (bayer(Math.floor(x + 64), Math.floor(y + 64)) - 0.5) * 0.2;
+    // coordenadas esféricas: longitude anda com o tempo
+    const longi = Math.atan2(x / r, nz) / Math.PI + lon;
+    const band = valueNoise(0.5, y / (r * 0.18) + 10, seed) * 0.45 + valueNoise(longi * 6, y / (r * 0.35), seed + 2) * 0.35;
+    const t = l * 0.75 + band * 0.45 + (bayer(Math.floor(x + 64), Math.floor(y + 64)) - 0.5) * 0.2;
     if (t < 0.12) return mix(cols[2], '#000000', 0.35);
     if (t < 0.35) return cols[2];
     if (t < 0.62) return cols[1];
@@ -852,15 +894,15 @@ function planet(r: number, cols: [string, string, string], ring: boolean, seed: 
   return g.toSprite();
 }
 
-function galaxy(t: Theme, seed: number): Sprite {
-  const w = 64;
-  const h = 34;
+function galaxyFrame(t: Theme, seed: number, rotA: number): Sprite {
+  const w = 72;
+  const h = 40;
   const g = new PixelGrid(w, h, w / 2, h / 2);
   const rng = new Rng(seed);
-  for (let i = 0; i < 1400; i++) {
+  for (let i = 0; i < 1500; i++) {
     const arm = i % 2;
-    const r = Math.pow(rng.next(), 0.7) * 28;
-    const a = r * 0.22 + arm * Math.PI + rng.range(-0.35, 0.35);
+    const r = Math.pow(rng.next(), 0.7) * 30;
+    const a = r * 0.22 + arm * Math.PI + rng.range(-0.35, 0.35) + rotA;
     const x = Math.cos(a) * r;
     const y = Math.sin(a) * r * 0.45;
     const c = r < 5 ? t.galaxy[0] : r < 14 ? t.galaxy[1] : t.galaxy[2];
@@ -896,12 +938,12 @@ export function makeBackground(zone: ZoneData): BackgroundArt {
   const far = starTile(256, 0.006, t.stars, seed + 1, false);
   const near = starTile(320, 0.0018, t.stars, seed + 2, true);
   const rngT = new Rng(seed + 9);
-  const twinkles = Array.from({ length: 40 }, () => ({ x: rngT.next(), y: rngT.next(), c: rngT.pick(t.stars), p: rngT.next() * 6.28 }));
+  const twinkles = Array.from({ length: 70 }, () => ({ x: rngT.next(), y: rngT.next(), c: rngT.pick(t.stars), p: rngT.next() * 6.28, s: rngT.range(0.6, 2.2) }));
 
   // nebulosa com distorção de domínio (fiapos)
   const scaleN = 2;
-  const nw = Math.ceil((zone.width + 600) / scaleN);
-  const nh = Math.ceil((zone.height + 400) / scaleN);
+  const nw = Math.ceil((zone.width + 700) / scaleN);
+  const nh = Math.ceil((zone.height + 450) / scaleN);
   const g = new PixelGrid(nw, nh);
   const neb = t.nebula;
   const cx = nw * (0.35 + new Rng(seed).next() * 0.3);
@@ -913,8 +955,7 @@ export function makeBackground(zone: ZoneData): BackgroundArt {
       const qx = fbm(wx, wy, seed, 3);
       const qy = fbm(wx + 5.2, wy + 1.3, seed + 4, 3);
       let v = fbm(wx + qx * 1.8, wy + qy * 1.8, seed + 8, 4);
-      // concentra a nebulosa numa faixa diagonal
-      const band = 1 - Math.min(1, Math.abs((y - cy) / nh - (x - cx) / nw * 0.6) * 2.2);
+      const band = 1 - Math.min(1, Math.abs((y - cy) / nh - ((x - cx) / nw) * 0.6) * 2.2);
       v = v * (0.5 + band * 0.7) - 0.42 + (bayer(x, y) - 0.5) * 0.07;
       if (v <= 0) continue;
       const k = Math.min(neb.length - 1, Math.floor(v * neb.length * 1.7));
@@ -922,40 +963,41 @@ export function makeBackground(zone: ZoneData): BackgroundArt {
     }
   }
   const rng = new Rng(seed + 5);
-  const planets: BackgroundArt['planets'] = [];
-  planets.push({ sprite: planet(rng.int(16, 24), t.planet, true, seed), x: rng.range(0.62, 0.88) * zone.width, y: rng.range(0.06, 0.2) * zone.height, par: 0.1 });
-  planets.push({ sprite: planet(rng.int(5, 8), [t.nebula[4], t.nebula[2], t.nebula[0]], false, seed + 3), x: rng.range(0.12, 0.4) * zone.width, y: rng.range(0.05, 0.16) * zone.height, par: 0.05 });
+  const planets: AnimatedPlanet[] = [];
+  const mkPlanet = (r: number, cols: [string, string, string], ring: boolean, ps: number, x: number, y: number, par: number, moon: boolean) => {
+    const frames: Sprite[] = [];
+    const N = 24;
+    for (let f = 0; f < N; f++) frames.push(planet(r, cols, ring, ps, f / N));
+    const moonCols: [string, string, string] = [mix(cols[0], '#ffffff', 0.4), mix(cols[1], '#888888', 0.4), mix(cols[2], '#222222', 0.3)];
+    planets.push({ frames, x, y, par, r, moon: moon ? planet(Math.max(2, Math.round(r * 0.22)), moonCols, false, ps + 9, 0) : null, moonOrbit: r * 2.3, moonSpeed: 0.35, spin: 40 });
+  };
+  mkPlanet(rng.int(16, 24), t.planet, true, seed, rng.range(0.62, 0.88) * zone.width, rng.range(0.06, 0.2) * zone.height, 0.1, true);
+  mkPlanet(rng.int(5, 8), [t.nebula[4], t.nebula[2], t.nebula[0]], false, seed + 3, rng.range(0.12, 0.4) * zone.width, rng.range(0.05, 0.16) * zone.height, 0.05, false);
   const farRocks: FarRock[] = [];
   for (let i = 0; i < 12; i++) {
     const size = rng.int(6, 26);
-    farRocks.push({ sprite: rockBlob(size, t.farRock, mix(t.farRock[1], t.rim, 0.35), seed + 40 + i), x: rng.range(-0.1, 1.1) * zone.width, y: rng.range(0.05, 0.95) * zone.height, par: 0.25 + size / 120 });
+    farRocks.push({
+      sprite: rockBlob(size, t.farRock, mix(t.farRock[1], t.rim, 0.35), seed + 40 + i),
+      x: rng.range(-0.1, 1.1) * zone.width,
+      y: rng.range(0.05, 0.95) * zone.height,
+      par: 0.25 + size / 120,
+      vx: rng.range(-3, 3),
+      vy: rng.range(-1.5, 1.5),
+    });
   }
-  // rochas grandes em primeiro plano, fora dos limites do mapa (moldura)
-  const frameRocks: FarRock[] = [];
-  const darks: [string, string] = [mix(t.farRock[0], '#000000', 0.35), mix(t.farRock[1], t.rock[2], 0.4)];
-  const spots = [
-    [-60, zone.height + 20],
-    [zone.width * 0.3, zone.height + 70],
-    [zone.width + 60, zone.height - 40],
-    [zone.width + 70, 60],
-    [-70, 40],
-    [zone.width * 0.75, zone.height + 80],
-  ];
-  spots.forEach(([x, y], i) => {
-    const size = rng.int(70, 140);
-    frameRocks.push({ sprite: rockBlob(size, darks, mix(t.rock[3], t.rim, 0.45), seed + 90 + i), x, y, par: 1.12 });
-  });
+  const galaxy: Sprite[] = [];
+  for (let f = 0; f < 16; f++) galaxy.push(galaxyFrame(t, seed + 7, (f / 16) * Math.PI * 2));
   return {
     far,
     near,
     twinkles,
     nebula: g.toSprite().canvas,
     nebulaScale: scaleN,
-    galaxy: galaxy(t, seed + 7),
+    galaxy,
     galaxyPos: { x: rng.range(0.4, 0.95) * zone.width, y: rng.range(0.04, 0.3) * zone.height },
     planets,
     farRocks,
-    frameRocks,
+    meteorColors: ['#fff6d8', '#ffd27a', '#ff9a3a', '#e0661e', '#7a2a10'],
   };
 }
 
@@ -993,4 +1035,95 @@ export function makeVignette(w: number, h: number): HTMLCanvasElement {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   return c;
+}
+
+// ---------------------------------------------------------------------------
+// Cursores e setas (pixel art desenhada à mão em grade de caracteres)
+// ---------------------------------------------------------------------------
+
+function fromRows(rows: string[], pal: Record<string, string>, hx: number, hy: number): Sprite {
+  const h = rows.length;
+  const w = Math.max(...rows.map((r) => r.length));
+  const g = new PixelGrid(w, h, hx, hy);
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const c = pal[row[x]];
+      if (c) g.set(x, y, c);
+    }
+  });
+  return g.toSprite();
+}
+
+export interface CursorArt {
+  arrow: Sprite;
+  pick: Sprite;
+  clawOpen: Sprite;
+  clawClosed: Sprite;
+  hand: Sprite;
+}
+
+let cursorCache: CursorArt | null = null;
+
+export function cursorArt(): CursorArt {
+  if (cursorCache) return cursorCache;
+  const pal = { k: '#0a0614', w: '#fff6dc', y: '#ffd27a', o: '#ff9a3a', b: '#8a5228', d: '#5a3014', s: '#cfd8ec', g: '#7a8aa8', c: '#55d7e8', C: '#bff6ff', n: '#1f7a8a' };
+  const arrow = fromRows(
+    ['k', 'kk', 'kwk', 'kwwk', 'kwwwk', 'kwwwwk', 'kwwwwwk', 'kwwwyyyk', 'kwwkyk', 'kwk kyk', 'kk  kyk', 'k    kk'],
+    pal,
+    0,
+    0,
+  );
+  // picareta: cabo de madeira na diagonal, cabeça de aço com fio âmbar
+  const pick = fromRows(
+    [
+      '   kkkkk      ',
+      '  kssssskk    ',
+      ' ksgggggssk   ',
+      'kskk  kkgssk  ',
+      'kk      kbgsk ',
+      '        kbbgk ',
+      '       kbdk ks',
+      '      kbdk  kk',
+      '     kbdk     ',
+      '    kbdk      ',
+      '   kbdk       ',
+      '  kbdk        ',
+      ' kbdk         ',
+      'kbdk          ',
+      'kkk           ',
+    ],
+    pal,
+    5,
+    2,
+  );
+  // garra do feixe: emissor com três dentes
+  const clawOpen = fromRows(
+    ['  kk     kk  ', ' kCck   kcCk ', ' kcnk   kncK ', '  kcnk kcnk  ', '   kcckcck   ', '    kcCck    ', '    kcnck    ', '   kkcnckk   ', '   kgsssgk   ', '   kgsssgk   ', '    kkkkk    '],
+    { ...pal, K: '#0a0614' },
+    6,
+    5,
+  );
+  const clawClosed = fromRows(
+    ['    k   k    ', '   kCk kCk   ', '   kcnknck   ', '    kcCck    ', '    kcCck    ', '    kcnck    ', '   kkcnckk   ', '   kgsssgk   ', '   kgsssgk   ', '    kkkkk    '],
+    pal,
+    6,
+    3,
+  );
+  const hand = fromRows(
+    ['   kk     ', '  kwwk    ', '  kwwk    ', '  kwwkkk  ', '  kwwkwwkk', 'kkkwwwwwwk', 'kwkwwwwwwk', 'kwwwwwwwwk', ' kwwwwwwwk', '  kwwwwwk ', '   kkkkkk '],
+    pal,
+    3,
+    1,
+  );
+  cursorCache = { arrow, pick, clawOpen, clawClosed, hand };
+  return cursorCache;
+}
+
+let arrowCache: Sprite | null = null;
+
+/** Seta apontando para +x (gira junto com a peça). */
+export function arrowSprite(): Sprite {
+  if (arrowCache) return arrowCache;
+  arrowCache = fromRows(['k   ', 'kyk ', 'kyyk', 'kyyyk', 'kyyk', 'kyk ', 'k   '].map((r) => r.padEnd(5, ' ')), { k: '#2a1006', y: '#ffd27a' }, 2, 3);
+  return arrowCache;
 }

@@ -15,6 +15,7 @@ export class Camera {
   /** áreas cobertas pela interface (px de buffer) */
   insetTop = 0;
   insetBottom = 0;
+  insetLeft = 0;
 
   setWorld(w: number, h: number) {
     this.worldW = w;
@@ -29,21 +30,22 @@ export class Camera {
     this.clampPos();
   }
 
-  setInsets(top: number, bottom: number) {
+  setInsets(top: number, bottom: number, left = 0) {
     this.insetTop = top;
     this.insetBottom = bottom;
+    this.insetLeft = left;
     this.minZoom = Math.min(1, this.fitZoom() * 0.92);
     this.clampPos();
   }
 
   fitZoom() {
-    return Math.min(this.viewW / (this.worldW + 30), (this.viewH - this.insetTop - this.insetBottom) / (this.worldH + 20));
+    return Math.min((this.viewW - this.insetLeft) / (this.worldW + 30), (this.viewH - this.insetTop - this.insetBottom) / (this.worldH + 20));
   }
 
   /** Centro da câmera que enquadra o mundo inteiro na área livre. */
   overviewCenter(zoom = this.fitZoom()) {
     const shift = (this.insetBottom - this.insetTop) / 2 / zoom;
-    return { x: this.worldW / 2, y: this.worldH / 2 + shift };
+    return { x: this.worldW / 2 - this.insetLeft / 2 / zoom, y: this.worldH / 2 + shift };
   }
 
   /** Converte ponto do buffer (px) para mundo. */
@@ -107,8 +109,11 @@ export class Camera {
     const vw = this.viewW / this.zoom;
     const vh = this.viewH / this.zoom;
     const m = 40;
-    if (vw >= this.worldW + m * 2) this.x = this.worldW / 2;
-    else this.x = clamp(this.x, vw / 2 - m, this.worldW - vw / 2 + m);
+    const left = this.insetLeft / this.zoom;
+    const lox = vw / 2 - m - left;
+    const hix = this.worldW - vw / 2 + m;
+    if (lox > hix) this.x = (lox + hix) / 2;
+    else this.x = clamp(this.x, lox, hix);
     const top = this.insetTop / this.zoom;
     const bot = this.insetBottom / this.zoom;
     const lo = vh / 2 - m - top;

@@ -9,9 +9,8 @@ export interface Tpl {
 export const TEMPLATES: Record<string, Tpl> = {
   z1C: {
     devices: [
-      { type: 'ramp', x: [395, 470], y: [400, 470], angle: [-0.8, 0.8] },
-      { type: 'bumper', x: [420, 560], y: [430, 500], angle: 0, params: { power: [3, 6] } },
-      { type: 'plank', x: [520, 590], y: [400, 445], angle: [-0.3, 0.3] },
+      { type: 'funnel', x: [410, 520], y: [420, 462], angle: [-0.15, 0.15] },
+      { type: 'spring', x: [420, 540], y: [478, 496], angle: [0.2, 0.9], params: { power: [6, 12] } },
     ],
   },
 };
@@ -41,7 +40,6 @@ TEMPLATES.z2C = {
     { type: 'plank', x: 564.7, y: 540.6, angle: 0.126 },
     { type: 'booster', x: [612, 640], y: [540, 556], angle: [-0.5, 0.15], params: { power: [3, 7] } },
     { type: 'launcher', x: [690, 790], y: [571, 575], angle: [0, 0.6], params: { power: [9, 13] } },
-    { type: 'deflector', x: [840, 940], y: [215, 265], angle: [-0.8, 0.8] },
     { type: 'plank', x: [880, 960], y: [330, 420], angle: [-0.6, 0.6] },
   ],
 };

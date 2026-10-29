@@ -2,14 +2,18 @@ import type { DeviceType, ParamDef } from '../machines/types';
 import type { GoalProgress, ZoneStats } from '../progression/Goals';
 import type { SaveData, Settings } from '../save/SaveManager';
 
-export interface ShopItem {
+export interface DockItem {
   type: DeviceType;
   name: string;
   desc: string;
+  howTo: string;
   limit: string;
   price: number;
   affordable: boolean;
-  isNew: boolean;
+  locked: boolean;
+  /** nó da árvore que libera a peça (quando bloqueada) */
+  nodeName?: string;
+  nodeCost?: number;
 }
 
 export interface ZoneCard {
@@ -18,9 +22,7 @@ export interface ZoneCard {
   subtitle: string;
   unlocked: boolean;
   complete: boolean;
-  goalsDone: number;
-  goalsTotal: number;
-  credits: number;
+  growth: number;
   current: boolean;
 }
 
@@ -28,20 +30,23 @@ export interface HudData {
   zoneId: number;
   zoneName: string;
   credits: number;
-  objective: string;
-  objectiveProgress: number;
-  efficiency: string;
+  growth: number;
+  growthLabel: string;
+  heat: number;
+  heatMult: number;
+  heatMax: number;
   paused: boolean;
-  combo: number;
-  research: number;
+  affordableNodes: number;
+  challengesDone: number;
+  challengesTotal: number;
   active: number;
   maxActive: number;
   fps: number;
-  goals: GoalProgress[];
   ghostActive: boolean;
   ghostValid: boolean;
   ghostReason: string;
   ghostPrice: number;
+  autoMine: number;
 }
 
 export interface SelectedInfo {
@@ -49,13 +54,12 @@ export interface SelectedInfo {
   type: DeviceType;
   name: string;
   desc: string;
-  limit: string;
+  howTo: string;
   params: ParamDef[];
   values: Record<string, number>;
   enabled: boolean;
   refund: number;
   manualGate: boolean;
-  gateOpen: boolean;
   angleDeg: number;
 }
 
@@ -74,9 +78,11 @@ export interface StatsInfo {
 export interface GameApi {
   readonly save: SaveData;
   zoneCards(): ZoneCard[];
-  shopItems(): ShopItem[];
-  researchAvailable(): number;
+  dockItems(): DockItem[];
   stats(): StatsInfo;
+  challenges(): GoalProgress[];
+  zoneHints(): string[];
+  reachedZone(): number;
   play(): void;
   openZone(id: number): void;
   startGhost(type: DeviceType): void;
@@ -93,11 +99,10 @@ export interface GameApi {
   overview(): void;
   home(): void;
   undo(): void;
-  buyResearch(id: string): void;
-  respec(): void;
-  convertCredits(zoneId: number): void;
-  conversionInfo(): { zoneId: number; name: string; credits: number; remaining: number; cost: number }[];
+  buyNode(id: string): boolean;
+  openTree(): void;
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void;
   resetSave(): void;
   uiSound(): void;
+  dockChanged(): void;
 }

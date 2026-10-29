@@ -25,20 +25,23 @@ npm test         # testes de aceitação (vitest)
 
 Stack: TypeScript + Vite + Canvas 2D + Matter.js. Sem servidor, sem assets externos: toda a arte e o áudio são gerados por código.
 
+## Como se joga
+
+- **Meta:** alimente o buraco negro. Ele cresce em tempo real; quando a barra enche, engole o mapa e você segue para o próximo, maior.
+- **Calor (×):** entregas seguidas aquecem o buraco negro e multiplicam massa e créditos (×3, até ×6 com a árvore). Ele esfria sozinho — fluxo contínuo rende muito mais que entregar uma a uma.
+- **Árvore estelar:** árvore de ~40 nós comprados com créditos. Libera as peças (só a Placa vem liberada), a **mineração automática** do asteroide e melhorias de calor, feixe, campos e economia. Alguns nós exigem chegar a certa zona.
+- **Peças:** Placa, Rampa curva, Funil, Mola, Esteira, Acelerador, Lançador, Almofada, Portinhola, Ventilador, Ímã, Repulsor, Braço, Elevador e Sensor. Mola e Lançador mostram o arco pontilhado ao posicionar; peças direcionais têm seta.
+- **Desafios:** objetivos opcionais por zona que pagam créditos.
+- Créditos são globais (valem em todas as zonas); cada zona guarda sua instalação.
+
 ## O que está implementado
 
-- **Loop físico**: asteroide clicável que solta fragmentos reais (corpos rígidos poligonais), gravidade de jogo, passo fixo de 1/60 s com 2 subpassos e limite de catch-up, interpolação no render.
-- **Feixe manual**: mola de força limitada (com alcance), respeitando colisões — não teleporta nem atravessa parede.
-- **Buraco negro**: atração curta com oclusão por rocha (raycast), absorção com entrega idempotente.
-- **Terreno indestrutível** em polígonos convexos, validado: nenhuma linha reta livre entre fonte e destino.
-- **16 peças** com física real: placa, rampa curva, defletor, bumper, propulsor, lançador aberto, ventilador, portinhola, esteira aberta, amortecedor, campo atrator/repulsor, braço basculante, elevador de campo, autoextrator e sensor+acionador (pós-campanha). Posicionamento livre com prévia verde/vermelha e motivo, giro (Q/E, roda, alça, ajuste fino), mover, copiar, desligar, revender, desfazer.
-- **7 tipos de fragmento**: comum, poroso, denso, metálico, vítreo (parte-se em lascas), instável (pulso local) e raro.
-- **5 zonas completas** (Limiar de Cinzas, Fenda de Órion, Labirinto de Basalto, Maré de Íons, Catedral do Horizonte), cada uma com objetivo básico, de engenharia e extras, carteira e instalação próprias salvas.
-- **Economia** (créditos locais, combo com teto, bônus de entrega automática), **eficiência** em janela móvel com pendentes, **pesquisa estelar** global com 5 ramos / 41 níveis e redistribuição gratuita.
-- **Música original** procedural a 74 BPM (64 compassos ≈ 3 min 28 s por volta, pad, subgrave, piano elétrico FM, plucks, sinos, variações determinísticas) e **efeitos sintetizados** com limite de vozes; volumes Master/Música/Efeitos/Mudo.
-- **Controles PC e toque em paisagem**: toque extrai, pressão longa segura, um dedo move a câmera, dois dedos fazem pan/zoom; aviso para girar em retrato.
-- **HUD minimalista** recolhível, loja recolhível, painel da peça, estatísticas com metodologia, ajustes de acessibilidade (escala da UI, menos partículas, sem tremor, contraste reforçado, encaixe opcional).
-- **Salvamento** automático com debounce, versão de esquema, migração e cópia de segurança.
+- Física com Matter.js (passo fixo, subpassos, colisões reais), feixe manual de força limitada, buraco negro com oclusão por rocha e crescimento, terreno indestrutível validado.
+- Arte 100% procedural em pixel art: paredes como aglomerados de meteoros com veios de magma, asteroide com minério pulsante, disco de acreção animado, fundo vivo (estrelas cintilantes, meteoros e estrelas cadentes, planeta girando com lua, galáxia, nebulosa à deriva), bloom aditivo e vinheta.
+- Cursores próprios no PC: picareta que golpeia no asteroide, garra que abre sobre uma pedra e fecha ao segurar.
+- Colapso final animado (o buraco negro engole o mapa) e tela "Supermassivo!".
+- Interface com molduras pixel 9-slice, fonte Silkscreen nos títulos e Inter nos números (OFL, empacotadas), barra de construção à esquerda com fichas explicativas, HUD com barra do buraco negro e medidor de calor, tela de título com cena própria.
+- Música original procedural (Web Audio) e efeitos sintetizados; save com migração (v3) e cópia de segurança; controles PC e toque em paisagem.
 
 ## Soluções de referência e testes
 
@@ -46,8 +49,8 @@ Cada zona documenta em `src/world/zones/zoneN.json` ao menos duas estratégias a
 
 | Zona | Estratégia A | Estratégia B |
 | --- | --- | --- |
-| 1 | placas sobre o fosso (~95%) | rampa curva + bumper + placa (~80%) |
-| 2 | catapulta com anteparo (~35–50%) | ponte + propulsor + lançador + defletor (~20–30%) |
+| 1 | placas sobre o fosso (~95%) | funil + mola (~98%) |
+| 2 | lançador com anteparo (~35–50%) | ponte + acelerador + lançador (~25–35%) |
 | 3 | placas sobre o poço + lançador (~75–95%) | esteiras + lançador (~60–85%) |
 | 4 | rota inferior + atrator (~95%) | rota superior via lançador + rampa (~40–55%) |
 | 5 | lançador no desfiladeiro (~40%) | elevador + ventilador (~25–55%) |

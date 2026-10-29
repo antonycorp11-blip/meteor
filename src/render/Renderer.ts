@@ -1,5 +1,6 @@
-import { transformPoly, type Vec } from '../core/geometry';
-import { DEVICES, FAN_LENGTH, FIELD_RADIUS, LIFT_HEIGHT, LIFT_WIDTH, footprint } from '../machines/catalog';
+import { Config } from '../core/Config';
+import { pointInPoly, transformPoly, type Vec } from '../core/geometry';
+import { DEVICES, FAN_LENGTH, FIELD_RADIUS, LIFT_HEIGHT, LIFT_WIDTH, deviceArrow, footprint } from '../machines/catalog';
 import type { DeviceType } from '../machines/types';
 import type { Device, Sim } from '../sim/Sim';
 import type { ZoneData } from '../world/types';
@@ -9,6 +10,8 @@ import { Particles } from './Particles';
 import { drawPixelText, textWidth } from './PixelFont';
 import {
   GLOW_SCALE,
+  arrowSprite,
+  cursorArt,
   deviceArt,
   fragmentGlowColor,
   makeAsteroid,
@@ -51,6 +54,18 @@ export interface Handle {
   r: number;
 }
 
+export type CursorKind = 'arrow' | 'pick' | 'clawOpen' | 'clawClosed' | 'hand' | 'none';
+
+export interface CursorState {
+  /** posição em px de buffer */
+  x: number;
+  y: number;
+  kind: CursorKind;
+  /** 0..1: animação de golpe da picareta */
+  swing: number;
+  visible: boolean;
+}
+
 export interface RenderState {
   sim: Sim;
   alpha: number;
@@ -69,13 +84,28 @@ export interface RenderState {
   hoverAsteroid: boolean;
   hoverFragment: number;
   hint: { x: number; y: number; text: string } | null;
+  /** 0..1 calor do buraco negro */
+  heat: number;
+  /** 0..1 progresso do colapso final (0 = nenhum) */
+  collapse: number;
+  cursor: CursorState;
+}
+
+interface Meteor {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  max: number;
+  size: number;
+  big: boolean;
 }
 
 /**
  * Desenha o mundo num buffer de pixels nítidos ampliado com nearest-neighbor.
  * A escala de pixel é escolhida para que o mapa inteiro apareça perto de
- * 1:1 (sem reamostrar a arte para baixo). Luzes vão numa camada aditiva de
- * baixa resolução (bloom discreto) que não borra os contornos.
+ * 1:1. Luzes vão numa camada aditiva de baixa resolução (bloom discreto).
  */
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -85,20 +115,24 @@ export class Renderer {
   private glow: HTMLCanvasElement;
   private gctx: CanvasRenderingContext2D;
   readonly camera = new Camera();
-  readonly particles = new Particles(600);
+  readonly particles = new Particles(700);
   pixelScale = 2;
   dpr = 1;
-  private insetCss = { top: 0, bottom: 0 };
+  private insetCss = { top: 0, bottom: 0, left: 0 };
   private zone: ZoneData | null = null;
   private terrain: TerrainArt | null = null;
   private asteroid: AsteroidArt | null = null;
   private hole: BlackHoleArt | null = null;
+  private bigHole: BlackHoleArt | null = null;
   private bg: BackgroundArt | null = null;
   private sky: HTMLCanvasElement | null = null;
   private vignette: HTMLCanvasElement | null = null;
   private fragSprites = new Map<number, Sprite>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
+  private meteors: Meteor[] = [];
+  private nextMeteor = 1;
   private frame = 0;
+  private titleOrbit: { a: number; r: number; w: number; c: string; s: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -109,8 +143,8 @@ export class Renderer {
     this.gctx = this.glow.getContext('2d')!;
   }
 
-  setInsetsCss(top: number, bottom: number) {
-    this.insetCss = { top, bottom };
+  setInsetsCss(top: number, bottom: number, left = 0) {
+    this.insetCss = { top, bottom, left };
   }
 
   resize() {
@@ -123,7 +157,8 @@ export class Renderer {
     let scale: number;
     if (this.zone) {
       const freeH = devH - (this.insetCss.top + this.insetCss.bottom) * dpr;
-      const fit = Math.min(devW / (this.zone.width + 30), freeH / (this.zone.height + 20));
+      const freeW = devW - this.insetCss.left * dpr;
+      const fit = Math.min(freeW / (this.zone.width + 30), freeH / (this.zone.height + 20));
       scale = Math.max(1, Math.floor(fit));
     } else scale = Math.max(1, Math.round(Math.min(devW / 640, devH / 360)));
     this.pixelScale = scale;
@@ -139,7 +174,8 @@ export class Renderer {
     this.glow.width = Math.ceil(bw / GLOW_SCALE);
     this.glow.height = Math.ceil(bh / GLOW_SCALE);
     this.camera.setView(bw, bh);
-    this.camera.setInsets((this.insetCss.top * dpr) / scale, (this.insetCss.bottom * dpr) / scale);
+    const k = dpr / scale;
+    this.camera.setInsets(this.insetCss.top * k, this.insetCss.bottom * k, this.insetCss.left * k);
     this.bctx.imageSmoothingEnabled = false;
     this.ctx.imageSmoothingEnabled = false;
     if ((changed || !this.sky) && this.zone) this.buildScreenLayers();
@@ -151,7 +187,6 @@ export class Renderer {
     this.vignette = makeVignette(this.buffer.width, this.buffer.height);
   }
 
-  /** CSS px (relativo ao canvas) → px do buffer. */
   cssToBuffer(cx: number, cy: number): Vec {
     return { x: (cx * this.dpr) / this.pixelScale, y: (cy * this.dpr) / this.pixelScale };
   }
@@ -160,8 +195,8 @@ export class Renderer {
     return this.dpr / this.pixelScale;
   }
 
-  /** Escala do texto em pixel para continuar legível com pixels pequenos. */
-  private textScale() {
+  /** Escala de texto/ícones em pixel para continuarem legíveis com pixels pequenos. */
+  private ui() {
     return Math.max(1, Math.round(2 / this.pixelScale));
   }
 
@@ -173,6 +208,7 @@ export class Renderer {
     this.bg = makeBackground(zone);
     this.fragSprites.clear();
     this.particles.clear();
+    this.meteors = [];
     this.camera.setWorld(zone.width, zone.height);
     this.sky = null;
     this.resize();
@@ -195,6 +231,79 @@ export class Renderer {
     return g;
   }
 
+  // ------------------------------------------------------------------
+  // Tela de título: buraco negro gigante engolindo um anel de detritos
+  // ------------------------------------------------------------------
+
+  renderTitle(time: number, dt: number, cursor: CursorState) {
+    if (!this.zone || !this.bg) return;
+    this.frame++;
+    this.particles.update(dt);
+    if (!this.bigHole) this.bigHole = makeBlackHole(46);
+    const ctx = this.bctx;
+    const W = this.buffer.width;
+    const H = this.buffer.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    if (this.sky) ctx.drawImage(this.sky, 0, 0);
+    const cam = this.camera;
+    const saved = { x: cam.x, y: cam.y };
+    cam.x = this.zone.width / 2 + Math.sin(time * 0.05) * 40;
+    cam.y = this.zone.height / 2;
+    this.drawBackground(time, dt, W, H);
+    cam.x = saved.x;
+    cam.y = saved.y;
+    // buraco negro gigante
+    const s = Math.max(1, Math.round(Math.min(W, H) / 260));
+    const cx = Math.round(W * (W > H * 1.3 ? 0.66 : 0.5));
+    const cy = Math.round(H * 0.52);
+    const hf = this.bigHole.frames[Math.floor(time * 10) % this.bigHole.frames.length];
+    ctx.drawImage(hf.canvas, cx - hf.ox * s, cy - hf.oy * s, hf.canvas.width * s, hf.canvas.height * s);
+    // detritos espiralando
+    if (this.titleOrbit.length < 90 && this.frame % 3 === 0) {
+      this.titleOrbit.push({ a: Math.random() * Math.PI * 2, r: 140 + Math.random() * 120, w: 0.25 + Math.random() * 0.3, c: Math.random() < 0.7 ? PAL.amber : '#e070c8', s: Math.random() < 0.2 ? 2 : 1 });
+    }
+    for (const o of this.titleOrbit) {
+      o.a += o.w * dt * (120 / Math.max(30, o.r));
+      o.r -= dt * (6 + 600 / Math.max(20, o.r));
+      const x = cx + Math.cos(o.a) * o.r * s;
+      const y = cy + Math.sin(o.a) * o.r * s * 0.42;
+      ctx.fillStyle = o.c;
+      ctx.fillRect(Math.round(x), Math.round(y), o.s * s, o.s * s);
+    }
+    this.titleOrbit = this.titleOrbit.filter((o) => o.r > 52);
+    const bc = this.bigHole.core;
+    ctx.drawImage(bc.canvas, cx - bc.ox * s, cy - bc.oy * s, bc.canvas.width * s, bc.canvas.height * s);
+    // brilho
+    const g = this.gctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, this.glow.width, this.glow.height);
+    g.globalCompositeOperation = 'lighter';
+    const k = 1 / GLOW_SCALE;
+    const sz = 520 * s * k;
+    g.globalAlpha = 0.5;
+    g.drawImage(this.glowSprite('#7a30c8'), cx * k - sz / 2, cy * k - sz / 2, sz, sz);
+    g.globalAlpha = 0.3;
+    g.drawImage(this.glowSprite('#ff9a5a'), cx * k - sz / 5, cy * k - sz / 5, sz / 2.5, sz / 2.5);
+    g.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.glow, 0, 0, this.glow.width * GLOW_SCALE, this.glow.height * GLOW_SCALE);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(bc.canvas, cx - bc.ox * s, cy - bc.oy * s, bc.canvas.width * s, bc.canvas.height * s);
+    if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
+    this.drawCursor(cursor, time);
+    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.drawImage(this.buffer, 0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  // ------------------------------------------------------------------
+  // Jogo
+  // ------------------------------------------------------------------
+
   render(s: RenderState, dt: number) {
     const zone = this.zone;
     if (!zone || !this.terrain || !this.asteroid || !this.hole || !this.bg) return;
@@ -205,16 +314,18 @@ export class Renderer {
     const W = this.buffer.width;
     const H = this.buffer.height;
     const z = cam.zoom;
-    const tx = Math.round(W / 2 - cam.x * z + s.shake.x);
-    const ty = Math.round(H / 2 - cam.y * z + s.shake.y);
-    const ts = this.textScale();
+    const col = s.collapse;
+    const quake = col > 0 ? col * 4 : 0;
+    const tx = Math.round(W / 2 - cam.x * z + s.shake.x + (Math.random() - 0.5) * quake);
+    const ty = Math.round(H / 2 - cam.y * z + s.shake.y + (Math.random() - 0.5) * quake);
+    const ui = this.ui();
 
     // --- fundo
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     if (this.sky) ctx.drawImage(this.sky, 0, 0);
-    this.drawBackground(s, W, H);
+    this.drawBackground(s.time, dt, W, H);
     if (s.highContrast) {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.fillRect(0, 0, W, H);
@@ -230,52 +341,71 @@ export class Renderer {
     this.drawAmbientFields(s, tx, ty);
     this.drawDeviceFields(s, tx, ty);
 
-    // --- terreno
+    // --- terreno (some no colapso)
     ctx.setTransform(z, 0, 0, z, tx, ty);
+    ctx.globalAlpha = Math.max(0, 1 - col * 1.4);
     ctx.drawImage(this.terrain.tex, 0, 0);
-
+    ctx.globalAlpha = 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const f of zone.fields) {
       const b = cam.toBuffer(f.x + f.w / 2, f.y);
       const arrow = f.ax < 0 ? '<' : f.ax > 0 ? '>' : '';
       const label = `${arrow}${arrow} ${f.label.toUpperCase()}`;
-      drawPixelText(ctx, label, b.x - textWidth(label, ts) / 2, b.y + 4 * ts, 'rgba(160,240,232,0.95)', ts, '#03141a');
+      drawPixelText(ctx, label, b.x - textWidth(label, ui) / 2, b.y + 4 * ui, 'rgba(160,240,232,0.95)', ui, '#03141a');
     }
 
-    // --- buraco negro
+    // --- buraco negro (cresce com a alimentação; enorme no colapso)
     const h = zone.blackHole;
-    const hf = this.hole.frames[Math.floor(s.time * 10) % this.hole.frames.length];
-    ctx.setTransform(z, 0, 0, z, tx, ty);
-    ctx.drawImage(hf.canvas, Math.round(h.x - hf.ox), Math.round(h.y - hf.oy));
+    const growth = s.sim.holeGrowth;
+    const hs = (1 + 0.75 * growth) * (1 + col * col * 14);
+    const hf = this.hole.frames[Math.floor(s.time * (10 + s.heat * 14)) % this.hole.frames.length];
     const hc = this.hole.core;
-    ctx.drawImage(hc.canvas, Math.round(h.x - hc.ox), Math.round(h.y - hc.oy));
+    const drawHole = (spr: Sprite) => {
+      ctx.setTransform(z * hs, 0, 0, z * hs, tx + z * h.x, ty + z * h.y);
+      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+    };
+    drawHole(hf);
+    drawHole(hc);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const cb = cam.toBuffer(h.x, h.y);
-    for (let i = 0; i < 30; i++) {
-      const r = h.absorbRadius + 6 + ((i * 7.3) % 26);
-      const a = s.time * (2.2 - r / 30) + i * 2.39;
-      ctx.fillStyle = i % 3 === 0 ? PAL.core : i % 3 === 1 ? '#e070c8' : '#ffffff';
-      ctx.fillRect(Math.round(cb.x + Math.cos(a) * r * z + s.shake.x), Math.round(cb.y + Math.sin(a) * r * z + s.shake.y), 1, 1);
+    const holeR = s.sim.holeAbsorb();
+    for (let i = 0; i < 36; i++) {
+      const r = (holeR + 6 + ((i * 7.3) % 28)) * (1 + col * 6);
+      const a = s.time * (2.2 + s.heat * 2.5 - r / 30) + i * 2.39;
+      ctx.fillStyle = s.heat > 0.6 && i % 2 ? '#fff4d8' : i % 3 === 0 ? PAL.core : i % 3 === 1 ? '#e070c8' : '#ff9a5a';
+      ctx.fillRect(Math.round(cb.x + Math.cos(a) * r * z + s.shake.x), Math.round(cb.y + Math.sin(a) * r * z + s.shake.y), ui, ui);
     }
-    if (s.buildMode) this.ringPx(cb.x, cb.y, h.attractRadius * z, 'rgba(176,104,232,0.5)', Math.floor(h.attractRadius * z * 0.9), true);
+    if (s.buildMode) this.ringPx(cb.x, cb.y, s.sim.holeAttract() * z, 'rgba(176,104,232,0.5)', Math.floor(s.sim.holeAttract() * z * 0.9), true);
 
     // --- asteroide
     const a = zone.asteroid;
     const ast = this.asteroid;
-    const jig = s.crack > 0.6 ? (Math.random() - 0.5) * 1.2 : 0;
+    const jig = s.crack > 0.6 ? (Math.random() - 0.5) * 1.6 : 0;
     ctx.setTransform(z, 0, 0, z, tx, ty);
+    ctx.globalAlpha = Math.max(0, 1 - col * 1.6);
     ctx.drawImage(ast.base.canvas, Math.round(a.x - ast.base.ox + jig), Math.round(a.y - ast.base.oy));
-    ctx.globalAlpha = Math.min(1, 0.6 + s.crack * 0.4 + Math.sin(s.time * 1.7) * 0.12 + (s.hoverAsteroid ? 0.2 : 0));
+    ctx.globalAlpha = Math.max(0, Math.min(1, 0.6 + s.crack * 0.4 + Math.sin(s.time * 1.7) * 0.12 + (s.hoverAsteroid ? 0.25 : 0)) - col);
     ctx.drawImage(ast.glow.canvas, Math.round(a.x - ast.glow.ox + jig), Math.round(a.y - ast.glow.oy));
     ctx.globalAlpha = 1;
+    // pedrinhas orbitando a fonte
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const ab = cam.toBuffer(a.x, a.y);
+    for (let i = 0; i < 9; i++) {
+      const ang = s.time * (0.35 + (i % 3) * 0.08) + i * 0.7;
+      const rr = (a.r + 8 + (i % 4) * 4) * z;
+      const px = ab.x + Math.cos(ang) * rr;
+      const py = ab.y + Math.sin(ang) * rr * 0.35;
+      const front = Math.sin(ang) > 0;
+      ctx.fillStyle = front ? (i % 3 ? '#8a6a7a' : PAL.amber) : '#3a2a3e';
+      ctx.fillRect(Math.round(px), Math.round(py), ui + (i % 2), ui);
+    }
     if (this.frame % 5 === 0 && this.particles.pool.length < this.particles.cap * 0.5) {
-      // brasas soltas pelas fissuras
       const ang = Math.random() * Math.PI * 2;
       this.particles.spawn({ x: a.x + Math.cos(ang) * a.r * 0.8, y: a.y + Math.sin(ang) * a.r * 0.8, vx: (Math.random() - 0.5) * 6, vy: -8 - Math.random() * 8, life: 1.6, color: Math.random() < 0.5 ? '#ff8a2a' : PAL.core, size: 1, gravity: -4 });
     }
 
     // --- dispositivos
-    for (const d of s.sim.devices.values()) this.drawDevice(d, z, tx, ty, s.time, d.enabled ? 1 : 0.5);
+    for (const d of s.sim.devices.values()) this.drawDevice(d, z, tx, ty, s.time, d.enabled ? 1 - col : 0.5 - col);
 
     // --- fragmentos
     const alpha = s.alpha;
@@ -306,22 +436,22 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const p of this.particles.pool) {
       const b = cam.toBuffer(p.x, p.y);
-      const sz = Math.max(1, Math.round(p.size * Math.min(2, z)));
+      const sz = Math.max(1, Math.round(p.size * Math.min(2, z))) * ui;
       ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
       ctx.fillStyle = p.color;
       ctx.fillRect(Math.round(b.x + s.shake.x), Math.round(b.y + s.shake.y), sz, sz);
     }
     ctx.globalAlpha = 1;
 
-    // --- luzes (bloom aditivo); o horizonte de eventos continua negro por cima
-    this.drawGlow(s, tx, ty);
-    ctx.setTransform(z, 0, 0, z, tx, ty);
-    ctx.drawImage(hc.canvas, Math.round(h.x - hc.ox), Math.round(h.y - hc.oy));
+    // --- luzes e horizonte negro por cima
+    this.drawGlow(s, tx, ty, hs);
+    drawHole(hc);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    // --- rochas de moldura em primeiro plano (fora do mapa) e vinheta
-    this.drawFrameRocks(W, H);
     if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
+    if (col > 0.85) {
+      ctx.fillStyle = `rgba(255,240,220,${(col - 0.85) / 0.15})`;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     // --- feixe manual
     if (s.sim.grab && s.grabPointer) {
@@ -331,28 +461,28 @@ export class Renderer {
         const pp = cam.toBuffer(s.grabPointer.x, s.grabPointer.y);
         const d = Math.hypot(s.grabPointer.x - f.body.position.x, s.grabPointer.y - f.body.position.y);
         const stretch = d / s.sim.grabReach();
-        const col = stretch > 0.75 ? PAL.amber : PAL.cyan;
-        this.linePx(fp.x + s.shake.x, fp.y + s.shake.y, pp.x + s.shake.x, pp.y + s.shake.y, col, 3, Math.floor(s.time * 20));
-        this.ringPx(pp.x + s.shake.x, pp.y + s.shake.y, 4, col, 12);
+        const c = stretch > 0.75 ? PAL.amber : PAL.cyan;
+        this.linePx(fp.x + s.shake.x, fp.y + s.shake.y, pp.x + s.shake.x, pp.y + s.shake.y, c, 3, Math.floor(s.time * 20));
+        this.ringPx(fp.x, fp.y, (f.radius + 4 + Math.sin(s.time * 12) * 1.5) * z, c, 16);
       }
     }
-    if (s.trajectory) {
-      for (let i = 0; i < s.trajectory.length; i += 2) {
-        const p = cam.toBuffer(s.trajectory[i].x, s.trajectory[i].y);
-        ctx.fillStyle = i % 4 ? 'rgba(255,224,138,0.5)' : 'rgba(255,224,138,0.95)';
-        ctx.fillRect(Math.round(p.x + s.shake.x), Math.round(p.y + s.shake.y), ts, ts);
-      }
-    }
+    if (s.trajectory) this.dots(s.trajectory, 'rgba(255,224,138,0.9)');
 
-    // --- seleção, fantasma e alças
-    if (s.selected) this.drawSelection(s.selected, s);
-    if (s.ghost) this.drawGhost(s.ghost, s, tx, ty);
+    // --- seleção, fantasma, prévias e alças
+    if (s.selected) {
+      this.drawSelection(s.selected, s);
+      this.drawDevicePreview(s.selected, s);
+    }
+    if (s.ghost) {
+      this.drawGhost(s.ghost, s, tx, ty);
+      this.drawDevicePreview(s.ghost, s);
+    }
     for (const hd of s.handles) {
       const b = cam.toBuffer(hd.x, hd.y);
       if (hd.kind === 'rotate') {
         this.ringPx(b.x, b.y, hd.r * z + 1, PAL.core, 20);
         ctx.fillStyle = PAL.core;
-        ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) - 1, 3, 3);
+        ctx.fillRect(Math.round(b.x) - ui, Math.round(b.y) - ui, ui * 2 + 1, ui * 2 + 1);
       }
     }
 
@@ -361,86 +491,142 @@ export class Renderer {
       const b = cam.toBuffer(fl.x, fl.y);
       const t = 1 - fl.life / fl.max;
       ctx.globalAlpha = Math.min(1, (fl.life / fl.max) * 2.5);
-      drawPixelText(ctx, fl.text, b.x - textWidth(fl.text, ts) / 2, b.y - 10 * ts - t * 16 * ts, fl.color, ts);
+      drawPixelText(ctx, fl.text, b.x - textWidth(fl.text, ui) / 2, b.y - 10 * ui - t * 16 * ui, fl.color, ui);
     }
     ctx.globalAlpha = 1;
     if (s.hint) {
       const b = cam.toBuffer(s.hint.x, s.hint.y);
       const bob = Math.round(Math.sin(s.time * 4) * 2);
-      drawPixelText(ctx, s.hint.text, b.x - textWidth(s.hint.text, ts) / 2, b.y + bob, PAL.core, ts, '#1a0c2a');
+      drawPixelText(ctx, s.hint.text, b.x - textWidth(s.hint.text, ui) / 2, b.y + bob, PAL.core, ui, '#1a0c2a');
     }
 
-    // --- blit
+    this.drawCursor(s.cursor, s.time);
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.drawImage(this.buffer, 0, 0, this.canvas.width, this.canvas.height);
   }
 
-  private drawBackground(s: RenderState, W: number, H: number) {
+  // ------------------------------------------------------------------
+  // Fundo animado
+  // ------------------------------------------------------------------
+
+  private drawBackground(time: number, dt: number, W: number, H: number) {
     const bg = this.bg!;
     const ctx = this.bctx;
     const cam = this.camera;
     const zw = this.zone!.width;
     const zh = this.zone!.height;
-    const tile = (img: HTMLCanvasElement, par: number) => {
+    const ui = this.ui();
+    const tile = (img: HTMLCanvasElement, par: number, driftX = 0) => {
       const tw = img.width;
       const th = img.height;
-      const ox = -(((cam.x * par) % tw) + tw) % tw;
+      const ox = -((((cam.x + driftX) * par) % tw) + tw) % tw;
       const oy = -(((cam.y * par) % th) + th) % th;
       for (let y = Math.floor(oy); y < H; y += th) for (let x = Math.floor(ox); x < W; x += tw) ctx.drawImage(img, x, y);
     };
-    tile(bg.far, 0.03);
-    // estrelas cintilantes
+    tile(bg.far, 0.03, time * 4);
+    // estrelas cintilantes: piscam de verdade (com cruz quando brilham)
     for (const t of bg.twinkles) {
-      const v = 0.5 + 0.5 * Math.sin(s.time * 1.3 + t.p);
-      if (v < 0.35) continue;
+      const v = 0.5 + 0.5 * Math.sin(time * t.s + t.p);
       const x = Math.round(t.x * W);
       const y = Math.round(t.y * H);
-      ctx.globalAlpha = v;
+      ctx.globalAlpha = 0.25 + v * 0.75;
       ctx.fillStyle = t.c;
-      ctx.fillRect(x, y, 1, 1);
-      if (v > 0.85) {
-        ctx.globalAlpha = (v - 0.85) * 4;
-        ctx.fillRect(x - 1, y, 3, 1);
-        ctx.fillRect(x, y - 1, 1, 3);
+      ctx.fillRect(x, y, ui, ui);
+      if (v > 0.8) {
+        ctx.globalAlpha = (v - 0.8) * 5;
+        ctx.fillRect(x - 2 * ui, y, 5 * ui, ui);
+        ctx.fillRect(x, y - 2 * ui, ui, 5 * ui);
       }
     }
     ctx.globalAlpha = 1;
-    // projeção paralaxe: posição na tela de um ponto do "céu" com fator par
     const par = (x: number, y: number, p: number) => ({
       x: Math.round(W / 2 + (x - zw / 2) * 0.9 - (cam.x - zw / 2) * p),
       y: Math.round(H / 2 + (y - zh / 2) * 0.9 - (cam.y - zh / 2) * p),
     });
+    // nebulosa derivando lentamente
     const ns = bg.nebulaScale;
-    const np = par(-300, -200, 0.18);
+    const np = par(-350 + Math.sin(time * 0.02) * 30, -220 + Math.cos(time * 0.017) * 18, 0.18);
     ctx.drawImage(bg.nebula, np.x, np.y, bg.nebula.width * ns * 0.9, bg.nebula.height * ns * 0.9);
+    const gf = bg.galaxy[Math.floor(time * 0.6) % bg.galaxy.length];
     const gp = par(bg.galaxyPos.x, bg.galaxyPos.y, 0.06);
-    ctx.drawImage(bg.galaxy.canvas, gp.x - bg.galaxy.ox, gp.y - bg.galaxy.oy);
+    ctx.drawImage(gf.canvas, gp.x - gf.ox, gp.y - gf.oy);
     for (const p of bg.planets) {
       const q = par(p.x, p.y, p.par);
-      ctx.drawImage(p.sprite.canvas, q.x - p.sprite.ox, q.y - p.sprite.oy);
+      const frame = p.frames[Math.floor(((time / p.spin) % 1) * p.frames.length)];
+      const ma = time * p.moonSpeed;
+      const mx = q.x + Math.cos(ma) * p.moonOrbit;
+      const my = q.y + Math.sin(ma) * p.moonOrbit * 0.32;
+      const behind = Math.sin(ma) < 0;
+      if (p.moon && behind) ctx.drawImage(p.moon.canvas, Math.round(mx - p.moon.ox), Math.round(my - p.moon.oy));
+      ctx.drawImage(frame.canvas, q.x - frame.ox, q.y - frame.oy);
+      if (p.moon && !behind) ctx.drawImage(p.moon.canvas, Math.round(mx - p.moon.ox), Math.round(my - p.moon.oy));
     }
-    tile(bg.near, 0.1);
+    tile(bg.near, 0.1, time * 9);
+    // rochas distantes à deriva
     for (const r of bg.farRocks) {
+      r.x += r.vx * dt;
+      r.y += r.vy * dt;
+      if (r.x < -zw * 0.2) r.x = zw * 1.2;
+      if (r.x > zw * 1.2) r.x = -zw * 0.2;
+      if (r.y < -zh * 0.2) r.y = zh * 1.2;
+      if (r.y > zh * 1.2) r.y = -zh * 0.2;
       const q = par(r.x, r.y, r.par);
       ctx.drawImage(r.sprite.canvas, q.x - r.sprite.ox, q.y - r.sprite.oy);
     }
+    this.drawMeteors(time, dt, W, H);
   }
 
-  private drawFrameRocks(W: number, H: number) {
+  /** Estrelas cadentes rápidas e meteoros grandes e lentos com cauda de fogo. */
+  private drawMeteors(time: number, dt: number, W: number, H: number) {
     const ctx = this.bctx;
-    const cam = this.camera;
-    const z = cam.zoom;
-    for (const r of this.bg!.frameRocks) {
-      const bx = W / 2 + (r.x - cam.x) * z * r.par;
-      const by = H / 2 + (r.y - cam.y) * z * r.par;
-      const sw = r.sprite.canvas.width * z;
-      const sh = r.sprite.canvas.height * z;
-      if (bx + sw < 0 || by + sh < 0 || bx - sw > W || by - sh > H) continue;
-      ctx.drawImage(r.sprite.canvas, Math.round(bx - r.sprite.ox * z), Math.round(by - r.sprite.oy * z), Math.round(sw), Math.round(sh));
+    const ui = this.ui();
+    if (time > this.nextMeteor) {
+      const big = Math.random() < 0.35;
+      const fromLeft = Math.random() < 0.5;
+      const sp = big ? 30 + Math.random() * 30 : 260 + Math.random() * 200;
+      const ang = (fromLeft ? 0.35 : Math.PI - 0.35) + (Math.random() - 0.5) * 0.4;
+      this.meteors.push({
+        x: fromLeft ? -20 : W + 20,
+        y: Math.random() * H * 0.6,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp,
+        life: big ? 40 : 2.5,
+        max: big ? 40 : 2.5,
+        size: big ? 2 + Math.floor(Math.random() * 2) : 1,
+        big,
+      });
+      this.nextMeteor = time + (big ? 5 : 1.5) + Math.random() * 4;
     }
+    const cols = this.bg!.meteorColors;
+    for (const m of this.meteors) {
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.life -= dt;
+      const len = m.big ? 26 : 18;
+      const l = Math.hypot(m.vx, m.vy) || 1;
+      const dx = m.vx / l;
+      const dy = m.vy / l;
+      for (let i = len; i >= 0; i--) {
+        const t = i / len;
+        ctx.globalAlpha = (1 - t) * (m.big ? 0.95 : 0.8);
+        ctx.fillStyle = cols[Math.min(cols.length - 1, Math.floor(t * cols.length))];
+        const w = Math.max(1, Math.round((m.size * (1 - t * 0.7)) * ui));
+        ctx.fillRect(Math.round(m.x - dx * i * ui * 1.5), Math.round(m.y - dy * i * ui * 1.5), w, w);
+      }
+      if (m.big) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#4a3040';
+        const r = (m.size + 2) * ui;
+        ctx.fillRect(Math.round(m.x - r / 2), Math.round(m.y - r / 2), r, r);
+        ctx.fillStyle = '#fff0c0';
+        ctx.fillRect(Math.round(m.x - r / 2), Math.round(m.y - r / 2), ui, ui);
+      }
+    }
+    ctx.globalAlpha = 1;
+    this.meteors = this.meteors.filter((m) => m.life > 0 && m.x > -80 && m.x < W + 80 && m.y < H + 80);
   }
 
-  private drawGlow(s: RenderState, tx: number, ty: number) {
+  private drawGlow(s: RenderState, tx: number, ty: number, holeScale: number) {
     const g = this.gctx;
     const gw = this.glow.width;
     const gh = this.glow.height;
@@ -452,23 +638,24 @@ export class Renderer {
     g.globalCompositeOperation = 'lighter';
     g.imageSmoothingEnabled = true;
     const zone = this.zone!;
-    // cristais do terreno
-    g.globalAlpha = 0.85 + Math.sin(s.time * 0.8) * 0.1;
-    g.drawImage(this.terrain!.glow, tx * k, ty * k, (zone.width * z) * k, (zone.height * z) * k);
+    g.globalAlpha = (0.85 + Math.sin(s.time * 0.8) * 0.1) * (1 - s.collapse);
+    g.drawImage(this.terrain!.glow, tx * k, ty * k, zone.width * z * k, zone.height * z * k);
     const put = (wx: number, wy: number, color: string, worldSize: number, alpha: number) => {
       const sz = worldSize * z * k;
       if (sz < 0.5) return;
       const x = (tx + wx * z) * k;
       const y = (ty + wy * z) * k;
       if (x < -sz || y < -sz || x > gw + sz || y > gh + sz) return;
-      g.globalAlpha = alpha;
+      g.globalAlpha = Math.min(1, alpha);
       g.drawImage(this.glowSprite(color), x - sz / 2, y - sz / 2, sz, sz);
     };
     const a = zone.asteroid;
     put(a.x, a.y, '#ff7a2a', a.r * 4, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
     const h = zone.blackHole;
-    put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4, 0.38);
-    put(h.x, h.y, '#ff9a5a', (h.absorbRadius + 6) * 2.2, 0.22);
+    put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4 * holeScale, 0.38);
+    // calor: o buraco negro esquenta de violeta para laranja/branco
+    put(h.x, h.y, '#ff7a2a', (h.absorbRadius + 30) * 2.6 * holeScale, 0.12 + s.heat * 0.45);
+    put(h.x, h.y, '#fff0c0', (h.absorbRadius + 8) * 2 * holeScale, s.heat * 0.35);
     for (const f of s.sim.fragments.values()) put(f.body.position.x, f.body.position.y, fragmentGlowColor(f.type), 26, 0.32);
     for (const d of s.sim.devices.values()) {
       if (!d.enabled) continue;
@@ -556,28 +743,23 @@ export class Renderer {
           ctx.fillRect(Math.round(tx + px * z), Math.round(ty + py * z), 1, 2);
         }
         if (show)
-          this.polyPx(
-            transformPoly([{ x: -15, y: -4 }, { x: 15, y: -4 }, { x: 15, y: -4 - Hh }, { x: -15, y: -4 - Hh }], d, d.angle),
-            'rgba(85,215,232,0.5)',
-            tx,
-            ty,
-            4,
-          );
+          this.polyPx(transformPoly([{ x: -15, y: -4 }, { x: 15, y: -4 }, { x: 15, y: -4 - Hh }, { x: -15, y: -4 - Hh }], d, d.angle), 'rgba(85,215,232,0.5)', tx, ty, 4);
       } else if (d.type === 'attractor' || d.type === 'repulsor') {
         const R = FIELD_RADIUS * mods.fieldRadiusMul;
-        const col = d.type === 'attractor' ? 'rgba(85,215,232,0.6)' : 'rgba(255,122,154,0.6)';
+        const colr = d.type === 'attractor' ? 'rgba(85,215,232,0.6)' : 'rgba(255,122,154,0.6)';
         const b = this.camera.toBuffer(d.x, d.y);
         for (let k = 0; k < 3; k++) {
           let t = (s.time * 0.45 + k / 3) % 1;
           if (d.type === 'attractor') t = 1 - t;
-          this.ringPx(b.x, b.y, R * t * z, col, Math.max(10, Math.floor(R * t * z * 0.6)));
+          this.ringPx(b.x, b.y, R * t * z, colr, Math.max(10, Math.floor(R * t * z * 0.6)));
         }
-        if (show) this.ringPx(b.x, b.y, R * z, col, Math.floor(R * z * 1.2), true);
+        if (show) this.ringPx(b.x, b.y, R * z, colr, Math.floor(R * z * 1.2), true);
       }
     }
   }
 
   drawDevice(d: Device, z: number, tx: number, ty: number, time: number, alpha: number) {
+    if (alpha <= 0) return;
     const ctx = this.bctx;
     const art = deviceArt(d.type);
     let spr = art.base;
@@ -590,11 +772,13 @@ export class Renderer {
         spr = art.frames[idx];
       } else if (d.enabled) spr = art.frames[Math.floor(time * 12) % art.frames.length];
     }
-    if (art.lit && (d.rt.flash > 0.3 || (d.type === 'autoextractor' && d.enabled && Math.sin(time * 3) > 0.7))) spr = art.lit;
+    if (art.lit && d.rt.flash > 0.3) spr = art.lit;
     const c = Math.cos(d.angle);
     const sn = Math.sin(d.angle);
     ctx.globalAlpha = alpha;
-    ctx.setTransform(z * c, z * sn, -z * sn, z * c, tx + z * d.x, ty + z * d.y);
+    // mola comprimida por um instante ao arremessar
+    const squash = d.type === 'spring' ? 1 - d.rt.flash * 0.25 : 1;
+    ctx.setTransform(z * c, z * sn, -z * sn * squash, z * c * squash, tx + z * d.x, ty + z * d.y);
     ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
     if (art.moving && d.pivotWorld) {
       let delta = 0;
@@ -606,8 +790,93 @@ export class Renderer {
       ctx.setTransform(z * ca, z * sa, -z * sa, z * ca, tx + z * d.pivotWorld.x, ty + z * d.pivotWorld.y);
       ctx.drawImage(art.moving.canvas, -art.moving.ox, -art.moving.oy);
     }
+    // seta de direção (gira com a peça; esteira com velocidade negativa inverte)
+    let dir = deviceArrow(d.type);
+    if (dir) {
+      if (d.type === 'conveyor' && (d.params.speed ?? 3) < 0) dir = { x: -1, y: 0 };
+      const ar = arrowSprite();
+      const la = Math.atan2(dir.y, dir.x) + d.angle;
+      const off = d.type === 'spring' ? -10 : d.type === 'launcher' ? -14 : d.type === 'lift' ? -12 : d.type === 'fan' ? 0 : -9;
+      const ox = d.type === 'fan' ? 13 : 0;
+      const wx = d.x + (ox * c - off * sn);
+      const wy = d.y + (ox * sn + off * c);
+      const bob = Math.sin(time * 5) * 1.2;
+      const ca = Math.cos(la);
+      const sa = Math.sin(la);
+      ctx.globalAlpha = alpha * 0.95;
+      ctx.setTransform(z * ca, z * sa, -z * sa, z * ca, tx + z * (wx + ca * bob), ty + z * (wy + sa * bob));
+      ctx.drawImage(ar.canvas, -ar.ox, -ar.oy);
+    }
     ctx.globalAlpha = 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** Arco pontilhado de onde a mola/lançador vão mandar as pedras. */
+  private drawDevicePreview(d: { type: DeviceType; x: number; y: number; angle: number; params: Record<string, number> }, s: RenderState) {
+    if (d.type !== 'spring' && d.type !== 'launcher') return;
+    const mods = s.sim.mods;
+    const n = { x: Math.sin(d.angle), y: -Math.cos(d.angle) };
+    const power = d.type === 'spring' ? (d.params.power ?? 8) * mods.springMul : d.params.power ?? 9;
+    let x = d.x + n.x * 8;
+    let y = d.y + n.y * 8;
+    let vx = n.x * power;
+    let vy = n.y * power;
+    const g = (Config.gravity / 3600) * this.zone!.gravity.y;
+    const pts: Vec[] = [];
+    const terr = s.sim.terrain;
+    for (let i = 0; i < 160; i++) {
+      vy += g;
+      vx += (Config.gravity / 3600) * this.zone!.gravity.x;
+      x += vx;
+      y += vy;
+      if (i % 2 === 0) pts.push({ x, y });
+      if (terr.some((p) => pointInPoly({ x, y }, p))) break;
+      if (Math.hypot(x - this.zone!.blackHole.x, y - this.zone!.blackHole.y) < s.sim.holeAbsorb()) break;
+      if (y > this.zone!.height + 40) break;
+    }
+    this.dots(pts, 'rgba(255,224,138,0.9)');
+  }
+
+  private dots(pts: Vec[], color: string) {
+    const ctx = this.bctx;
+    const ui = this.ui();
+    ctx.fillStyle = color;
+    for (let i = 0; i < pts.length; i++) {
+      const p = this.camera.toBuffer(pts[i].x, pts[i].y);
+      ctx.globalAlpha = 1 - (i / pts.length) * 0.7;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), ui + (i % 3 === 0 ? 1 : 0), ui + (i % 3 === 0 ? 1 : 0));
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private drawCursor(c: CursorState, time: number) {
+    if (!c.visible || c.kind === 'none') return;
+    const art = cursorArt();
+    const spr = art[c.kind];
+    const s = this.ui();
+    const ctx = this.bctx;
+    if (c.kind === 'pick') {
+      // golpe: a picareta gira para trás e desce
+      const sw = c.swing;
+      const ang = sw > 0 ? (sw > 0.5 ? -0.9 * (1 - (sw - 0.5) * 2) : -0.9 * (sw * 2)) : Math.sin(time * 3) * 0.06;
+      const ca = Math.cos(ang);
+      const sa = Math.sin(ang);
+      ctx.setTransform(s * ca, s * sa, -s * sa, s * ca, Math.round(c.x), Math.round(c.y));
+      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      return;
+    }
+    let ox = 0;
+    let oy = 0;
+    if (c.kind === 'clawOpen') oy = Math.round(Math.sin(time * 6) * 1);
+    ctx.setTransform(s, 0, 0, s, Math.round(c.x), Math.round(c.y + oy * s));
+    ctx.drawImage(spr.canvas, -spr.ox + ox, -spr.oy);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (c.kind === 'clawClosed') {
+      // anéis de energia em volta da garra
+      const r = 9 * s + Math.sin(time * 14) * s;
+      this.ringPx(c.x, c.y + 2 * s, r, 'rgba(85,215,232,0.85)', 14);
+    }
   }
 
   private drawSelection(d: Device, s: RenderState) {
@@ -630,9 +899,9 @@ export class Renderer {
       rt: { flash: 0, open: 0, swing: 0 },
       pivotWorld: DEVICES[g.type].pivot ? transformPoly([DEVICES[g.type].pivot!], g, g.angle)[0] : null,
     } as unknown as Device;
-    this.drawDevice(fake, z, tx, ty, s.time, 0.75);
-    const col = g.valid ? PAL.ok : PAL.bad;
-    for (const p of footprint(g.type, g.params).map((q) => transformPoly(q, g, g.angle))) this.polyPx(p, col, tx, ty, 0);
+    this.drawDevice(fake, z, tx, ty, s.time, 0.8);
+    const colr = g.valid ? PAL.ok : PAL.bad;
+    for (const p of footprint(g.type, g.params).map((q) => transformPoly(q, g, g.angle))) this.polyPx(p, colr, tx, ty, 0);
     const def = DEVICES[g.type];
     if (def.field) {
       const f = def.field(g.params, { radius: s.sim.mods.fieldRadiusMul });
@@ -641,13 +910,7 @@ export class Renderer {
         this.ringPx(b.x, b.y, f.radius * z, 'rgba(85,215,232,0.6)', Math.floor(f.radius * z), true);
       } else if (f.rect) {
         const r = f.rect;
-        this.polyPx(
-          transformPoly([{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }], g, g.angle),
-          'rgba(85,215,232,0.6)',
-          tx,
-          ty,
-          3,
-        );
+        this.polyPx(transformPoly([{ x: r.x0, y: r.y0 }, { x: r.x1, y: r.y0 }, { x: r.x1, y: r.y1 }, { x: r.x0, y: r.y1 }], g, g.angle), 'rgba(85,215,232,0.6)', tx, ty, 3);
       }
     }
   }
@@ -667,7 +930,7 @@ export class Renderer {
     const sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
     let i = phase;
-    const w = this.textScale();
+    const w = this.ui();
     for (let guard = 0; guard < 6000; guard++) {
       if (!dash || Math.floor(i / dash) % 2 === 0) ctx.fillRect(x0, y0, w, w);
       i++;
@@ -697,7 +960,7 @@ export class Renderer {
     const ctx = this.bctx;
     ctx.fillStyle = color;
     const steps = Math.max(8, n);
-    const w = this.textScale();
+    const w = this.ui();
     for (let i = 0; i < steps; i++) {
       if (dotted && i % 2) continue;
       const a = (i / steps) * Math.PI * 2;

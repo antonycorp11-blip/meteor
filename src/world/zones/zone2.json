@@ -1,10 +1,10 @@
 {
  "id": 2,
  "key": "orion",
- "name": "Fenda de \u00d3rion",
- "subtitle": "Abismo e c\u00e2mara elevada",
+ "name": "Fenda de Órion",
+ "subtitle": "Abismo e câmara elevada",
  "theme": "orion",
- "intro": "Um abismo e um pared\u00e3o. Eleve ou lance os fragmentos.",
+ "intro": "Um abismo e um paredão. Eleve ou lance os fragmentos.",
  "width": 1120,
  "height": 640,
  "gravity": {
@@ -210,7 +210,8 @@
  "regions": [],
  "tools": [
   "booster",
-  "launcher"
+  "launcher",
+  "damper"
  ],
  "startCredits": 60,
  "priceMult": 1.1,
@@ -236,31 +237,31 @@
      "target": 160
     }
    ],
-   "research": 3
+   "reward": 120
   },
   {
    "id": "z2-eng",
    "tier": "engineering",
-   "title": "Efici\u00eancia de 40% (janela de 40 fragmentos)",
+   "title": "Eficiência de 40% (janela de 40 fragmentos)",
    "reqs": [
     {
      "kind": "efficiency",
      "pct": 40
     }
    ],
-   "research": 3
+   "reward": 180
   },
   {
    "id": "z2-x1",
    "tier": "extra",
-   "title": "Entrega por lan\u00e7amento a 250 px ou mais",
+   "title": "Entrega por lançamento a 250 px ou mais",
    "reqs": [
     {
      "kind": "launchDistance",
      "dist": 250
     }
    ],
-   "research": 2
+   "reward": 120
   },
   {
    "id": "z2-x2",
@@ -272,18 +273,18 @@
      "count": 15
     }
    ],
-   "research": 2
+   "reward": 120
   }
  ],
  "hints": [
-  "O lan\u00e7ador n\u00e3o trava o fragmento: ele s\u00f3 d\u00e1 o impulso.",
+  "O lançador não trava o fragmento: ele só dá o impulso.",
   "Uma placa receptora depois do arco evita que o fragmento quique de volta.",
-  "Propulsores em sequ\u00eancia vencem um desn\u00edvel aos poucos."
+  "Propulsores em sequência vencem um desnível aos poucos."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Catapulta na borda com anteparo e placa receptora na c\u00e2mara",
+   "label": "Catapulta na borda com anteparo e placa receptora na câmara",
    "aim": {
     "x": 260,
     "y": 340
@@ -315,12 +316,12 @@
   },
   {
    "id": "B",
-   "label": "Ponte de placas, propulsor e lan\u00e7ador na plataforma com defletor sobre o pared\u00e3o",
+   "label": "Ponte de placas, acelerador e lançador na plataforma",
    "aim": {
     "x": 260,
     "y": 340
    },
-   "expectRate": 0.08,
+   "expectRate": 0.12,
    "devices": [
     {
      "type": "plank",
@@ -342,41 +343,36 @@
     },
     {
      "type": "booster",
-     "x": 628.7,
-     "y": 552.1,
-     "angle": -0.106,
+     "x": 618.9,
+     "y": 554,
+     "angle": -0.46,
      "params": {
-      "power": 5.24
+      "power": 7
      }
     },
     {
      "type": "launcher",
-     "x": 771.4,
+     "x": 767.7,
      "y": 571,
-     "angle": 0.093,
+     "angle": 0.09,
      "params": {
-      "power": 12.29
+      "power": 12.12
      }
     },
     {
-     "type": "deflector",
-     "x": 901.8,
-     "y": 236.2,
-     "angle": -0.747
-    },
-    {
      "type": "plank",
-     "x": 891.3,
-     "y": 342.7,
-     "angle": 0.547
+     "x": 892.2,
+     "y": 386,
+     "angle": 0.32
     }
    ]
   },
   {
    "id": "C",
-   "label": "Arrasto manual at\u00e9 a borda superior do pared\u00e3o e ricochete na c\u00e2mara",
+   "label": "Arrasto manual até a borda superior do paredão e ricochete na câmara",
    "manual": true,
    "devices": []
   }
- ]
+ ],
+ "growthTarget": 1600
 }

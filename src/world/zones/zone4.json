@@ -1,7 +1,7 @@
 {
  "id": 4,
  "key": "ions",
- "name": "Mar\u00e9 de \u00cdons",
+ "name": "Maré de Íons",
  "subtitle": "Duas rotas ao redor de um arco rochoso",
  "theme": "ion",
  "intro": "Campos regionais e massas diferentes. Separe, curve e entregue.",
@@ -227,7 +227,7 @@
  "fields": [
   {
    "id": "vento",
-   "label": "Vento i\u00f4nico",
+   "label": "Vento iônico",
    "x": 920,
    "y": 280,
    "w": 80,
@@ -256,8 +256,7 @@
  ],
  "tools": [
   "attractor",
-  "repulsor",
-  "damper"
+  "repulsor"
  ],
  "startCredits": 120,
  "priceMult": 1.3,
@@ -291,12 +290,12 @@
      "target": 600
     }
    ],
-   "research": 3
+   "reward": 240
   },
   {
    "id": "z4-eng",
    "tier": "engineering",
-   "title": "60% de efici\u00eancia, 35 entregas autom\u00e1ticas e 20 densos absorvidos",
+   "title": "60% de eficiência, 35 entregas automáticas e 20 densos absorvidos",
    "reqs": [
     {
      "kind": "efficiency",
@@ -311,12 +310,12 @@
      "count": 20
     }
    ],
-   "research": 3
+   "reward": 360
   },
   {
    "id": "z4-x1",
    "tier": "extra",
-   "title": "Use as duas rotas na mesma instala\u00e7\u00e3o (10 + 10)",
+   "title": "Use as duas rotas na mesma instalação (10 + 10)",
    "reqs": [
     {
      "kind": "bothRoutes",
@@ -327,25 +326,25 @@
      ]
     }
    ],
-   "research": 2
+   "reward": 240
   },
   {
    "id": "z4-x2",
    "tier": "extra",
-   "title": "10 entregas com curva gravitacional, sem lan\u00e7ador",
+   "title": "10 entregas com curva gravitacional, sem lançador",
    "reqs": [
     {
      "kind": "fieldCurve",
      "count": 10
     }
    ],
-   "research": 2
+   "reward": 240
   }
  ],
  "hints": [
-  "O vento i\u00f4nico empurra mais os leves que os densos.",
-  "Campos n\u00e3o atravessam rocha: posicione-os com linha de vis\u00e3o.",
-  "Met\u00e1licos sentem os campos com muito mais for\u00e7a."
+  "O vento iônico empurra mais os leves que os densos.",
+  "Campos não atravessam rocha: posicione-os com linha de visão.",
+  "Metálicos sentem os campos com muito mais força."
  ],
  "solutions": [
   {
@@ -425,7 +424,7 @@
   },
   {
    "id": "B",
-   "label": "Rota superior: lan\u00e7ador com anteparo, topo do arco, queda pelo vento e rampa curva",
+   "label": "Rota superior: lançador com anteparo, topo do arco, queda pelo vento e rampa curva",
    "aim": {
     "x": 230,
     "y": 140
@@ -467,9 +466,10 @@
   },
   {
    "id": "C",
-   "label": "Separar densos (rota inferior) e leves (rota superior) na mesma instala\u00e7\u00e3o",
+   "label": "Separar densos (rota inferior) e leves (rota superior) na mesma instalação",
    "manual": true,
    "devices": []
   }
- ]
+ ],
+ "growthTarget": 7000
 }

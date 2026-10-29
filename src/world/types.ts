@@ -48,7 +48,8 @@ export interface GoalDef {
   tier: GoalTier;
   title: string;
   reqs: GoalReq[];
-  research: number;
+  /** créditos de recompensa do desafio */
+  reward: number;
 }
 
 export interface ZoneData {
@@ -75,6 +76,8 @@ export interface ZoneData {
   priceMult: number;
   fragmentTable: { type: FragmentTypeId; weight: number }[];
   efficiencyWindow: number;
+  /** energia (massa × calor) para o buraco negro crescer e engolir o mapa */
+  growthTarget: number;
   goals: GoalDef[];
   hints: string[];
   /** Soluções de referência (documentação + testes automatizados). */

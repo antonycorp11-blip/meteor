@@ -208,7 +208,7 @@ describe('peças', () => {
       sim.extract(null, true);
       step(sim, 10);
     }
-    const d = sim.addDevice({ type: 'bumper', x: 470, y: 440, angle: 0, params: defaultParams('bumper'), enabled: true, paid: 30 });
+    const d = sim.addDevice({ type: 'spring', x: 470, y: 440, angle: 0, params: defaultParams('spring'), enabled: true, paid: 30 });
     step(sim, 30);
     sim.moveDevice(d, 480, 450, 0.5);
     step(sim, 30);
@@ -220,6 +220,50 @@ describe('peças', () => {
       expect(Number.isFinite(f.body.position.x)).toBe(true);
       expect(Number.isFinite(f.body.position.y)).toBe(true);
     }
+  });
+
+  it('mola arremessa na direção da seta só quem encosta por cima', () => {
+    const sim = new Sim(testZone());
+    sim.addDevice({ type: 'spring', x: 300, y: 400, angle: 0.5, params: { power: 9 }, enabled: true, paid: 0 });
+    const f = sim.spawnFragment('common', { x: 300, y: 380 }, { x: 0, y: 1 });
+    let minY = 999;
+    for (let i = 0; i < 40; i++) {
+      sim.step();
+      minY = Math.min(minY, f.body.position.y);
+    }
+    expect(minY).toBeLessThan(350);
+    expect(f.body.position.x).toBeGreaterThan(310);
+  });
+
+  it('funil concentra a queda num único ponto', () => {
+    const sim = new Sim(testZone());
+    sim.addDevice({ type: 'funnel', x: 400, y: 300, angle: 0, params: {}, enabled: true, paid: 0 });
+    const xs: number[] = [];
+    const fs = [-30, -15, 15, 30].map((dx) => sim.spawnFragment('common', { x: 400 + dx, y: 250 }, { x: 0, y: 0 }));
+    for (let i = 0; i < 90; i++) {
+      sim.step();
+      for (const f of fs) if (f.body.position.y > 312 && f.body.position.y < 330) xs.push(f.body.position.x);
+    }
+    expect(xs.length).toBeGreaterThan(0);
+    for (const x of xs) expect(Math.abs(x - 400)).toBeLessThan(14);
+  });
+
+  it('mineração automática solta pedras sozinha', () => {
+    const sim = new Sim(testZone());
+    sim.mods = { ...sim.mods, autoMineInterval: 1 };
+    let auto = 0;
+    sim.events.on('extract', (e) => e.auto && auto++);
+    for (let i = 0; i < 60 * 3.5; i++) sim.step();
+    expect(auto).toBe(3);
+  });
+
+  it('o buraco negro cresce e alcança mais longe', () => {
+    const sim = new Sim(testZone());
+    const r0 = sim.holeAttract();
+    const a0 = sim.holeAbsorb();
+    sim.holeGrowth = 1;
+    expect(sim.holeAttract()).toBeGreaterThan(r0);
+    expect(sim.holeAbsorb()).toBeGreaterThan(a0);
   });
 
   it('campos não atravessam paredes', () => {
