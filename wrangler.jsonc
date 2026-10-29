@@ -1,0 +1,10 @@
+{
+  // Site estático: o Cloudflare só publica a pasta gerada pelo `npm run build`.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "meteor",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
