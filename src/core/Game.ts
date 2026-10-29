@@ -174,6 +174,7 @@ export class Game implements GameApi {
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.onResize(), 200));
 
+    if (window.innerHeight < 480) this.shop.setOpen(false); // celular em paisagem: mais espaço para o mapa
     this.renderer.resize();
     this.openZoneInternal(Math.min(this.save.currentZone, this.save.unlockedZone), true);
     this.applySettings();
@@ -446,6 +447,7 @@ export class Game implements GameApi {
         shake: { x: (Math.random() - 0.5) * shakeAmt * 2, y: (Math.random() - 0.5) * shakeAmt * 2 },
         trajectory: this.trajectory(),
         highContrast: this.save.settings.highContrast,
+        reduceGlow: this.save.settings.reduceParticles,
         hoverAsteroid: this.hoverAsteroid,
         hoverFragment: this.hoverFragment,
         hint: this.tutorialHint(),
@@ -1241,15 +1243,14 @@ export class Game implements GameApi {
 
   /** Informa à câmera quanto da tela o HUD e a loja ocupam. */
   updateInsets() {
-    const k = this.renderer.bufferPerCss();
     const compact = window.innerHeight < 480;
-    const top = (compact ? 92 : 62) * this.save.settings.uiScale;
-    const bottom = this.shop.isOpen() ? (compact ? 88 : 124) * this.save.settings.uiScale : 40;
-    this.renderer.camera.setInsets(top * k, bottom * k);
+    const top = (compact ? 92 : 66) * this.save.settings.uiScale;
+    const bottom = this.shop.isOpen() ? (compact ? 88 : 128) * this.save.settings.uiScale : 40;
+    this.renderer.setInsetsCss(top, bottom);
+    this.renderer.resize();
   }
 
   private onResize() {
-    this.renderer.resize();
     this.updateInsets();
     const portrait = window.innerHeight > window.innerWidth * 1.05;
     document.body.classList.toggle('portrait', portrait && this.isTouchDevice);

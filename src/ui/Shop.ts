@@ -45,7 +45,7 @@ export class Shop {
       items.forEach((it, i) => {
         let ic = this.icons.get(it.type);
         if (!ic) {
-          ic = deviceIcon(it.type, 40);
+          ic = deviceIcon(it.type, 44);
           this.icons.set(it.type, ic);
         }
         const price = h('span', { class: 'price' }, '');

@@ -8,15 +8,21 @@ import { PAL, THEMES } from './palette';
 import { Particles } from './Particles';
 import { drawPixelText, textWidth } from './PixelFont';
 import {
+  GLOW_SCALE,
   deviceArt,
+  fragmentGlowColor,
   makeAsteroid,
   makeBackground,
   makeBlackHole,
   makeFragmentSprite,
-  makeTerrainTexture,
+  makeGlowSprite,
+  makeSky,
+  makeTerrainArt,
+  makeVignette,
   type AsteroidArt,
   type BackgroundArt,
   type BlackHoleArt,
+  type TerrainArt,
 } from './ProceduralArt';
 import { makeCanvas, type Sprite } from './PixelSprite';
 
@@ -59,30 +65,39 @@ export interface RenderState {
   shake: Vec;
   trajectory: Vec[] | null;
   highContrast: boolean;
+  reduceGlow: boolean;
   hoverAsteroid: boolean;
   hoverFragment: number;
   hint: { x: number; y: number; text: string } | null;
 }
 
 /**
- * Desenha o mundo num buffer de baixa resolução (≈640×360 px lógicos) e
- * amplia com nearest-neighbor para manter pixels nítidos.
+ * Desenha o mundo num buffer de pixels nítidos ampliado com nearest-neighbor.
+ * A escala de pixel é escolhida para que o mapa inteiro apareça perto de
+ * 1:1 (sem reamostrar a arte para baixo). Luzes vão numa camada aditiva de
+ * baixa resolução (bloom discreto) que não borra os contornos.
  */
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   readonly buffer: HTMLCanvasElement;
   private bctx: CanvasRenderingContext2D;
+  private glow: HTMLCanvasElement;
+  private gctx: CanvasRenderingContext2D;
   readonly camera = new Camera();
   readonly particles = new Particles(600);
   pixelScale = 2;
   dpr = 1;
+  private insetCss = { top: 0, bottom: 0 };
   private zone: ZoneData | null = null;
-  private terrain: HTMLCanvasElement | null = null;
+  private terrain: TerrainArt | null = null;
   private asteroid: AsteroidArt | null = null;
   private hole: BlackHoleArt | null = null;
   private bg: BackgroundArt | null = null;
+  private sky: HTMLCanvasElement | null = null;
+  private vignette: HTMLCanvasElement | null = null;
   private fragSprites = new Map<number, Sprite>();
+  private glowSprites = new Map<string, HTMLCanvasElement>();
   private frame = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -90,28 +105,50 @@ export class Renderer {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.buffer = makeCanvas(640, 360);
     this.bctx = this.buffer.getContext('2d')!;
+    this.glow = makeCanvas(160, 90);
+    this.gctx = this.glow.getContext('2d')!;
+  }
+
+  setInsetsCss(top: number, bottom: number) {
+    this.insetCss = { top, bottom };
   }
 
   resize() {
-    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.dpr = dpr;
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
     const devW = Math.floor(cssW * dpr);
     const devH = Math.floor(cssH * dpr);
-    const scale = Math.max(1, Math.round(Math.min(devW / 640, devH / 360)));
+    let scale: number;
+    if (this.zone) {
+      const freeH = devH - (this.insetCss.top + this.insetCss.bottom) * dpr;
+      const fit = Math.min(devW / (this.zone.width + 30), freeH / (this.zone.height + 20));
+      scale = Math.max(1, Math.floor(fit));
+    } else scale = Math.max(1, Math.round(Math.min(devW / 640, devH / 360)));
     this.pixelScale = scale;
     const bw = Math.ceil(devW / scale);
     const bh = Math.ceil(devH / scale);
+    const changed = bw !== this.buffer.width || bh !== this.buffer.height;
     this.buffer.width = bw;
     this.buffer.height = bh;
     this.canvas.width = bw * scale;
     this.canvas.height = bh * scale;
     this.canvas.style.width = `${(bw * scale) / dpr}px`;
     this.canvas.style.height = `${(bh * scale) / dpr}px`;
+    this.glow.width = Math.ceil(bw / GLOW_SCALE);
+    this.glow.height = Math.ceil(bh / GLOW_SCALE);
     this.camera.setView(bw, bh);
+    this.camera.setInsets((this.insetCss.top * dpr) / scale, (this.insetCss.bottom * dpr) / scale);
     this.bctx.imageSmoothingEnabled = false;
     this.ctx.imageSmoothingEnabled = false;
+    if ((changed || !this.sky) && this.zone) this.buildScreenLayers();
+  }
+
+  private buildScreenLayers() {
+    const t = THEMES[this.zone!.theme];
+    this.sky = makeSky(t, this.buffer.width, this.buffer.height);
+    this.vignette = makeVignette(this.buffer.width, this.buffer.height);
   }
 
   /** CSS px (relativo ao canvas) → px do buffer. */
@@ -119,29 +156,43 @@ export class Renderer {
     return { x: (cx * this.dpr) / this.pixelScale, y: (cy * this.dpr) / this.pixelScale };
   }
 
-  /** Quantos px de buffer equivalem a 1 px CSS. */
   bufferPerCss() {
     return this.dpr / this.pixelScale;
   }
 
+  /** Escala do texto em pixel para continuar legível com pixels pequenos. */
+  private textScale() {
+    return Math.max(1, Math.round(2 / this.pixelScale));
+  }
+
   setZone(zone: ZoneData, highContrast: boolean) {
     this.zone = zone;
-    this.terrain = makeTerrainTexture(zone, highContrast);
+    this.terrain = makeTerrainArt(zone, highContrast);
     this.asteroid = makeAsteroid(zone.asteroid.r, zone.id * 31 + 5);
     this.hole = makeBlackHole(zone.blackHole.absorbRadius);
     this.bg = makeBackground(zone);
     this.fragSprites.clear();
     this.particles.clear();
     this.camera.setWorld(zone.width, zone.height);
-    this.camera.setView(this.buffer.width, this.buffer.height);
+    this.sky = null;
+    this.resize();
   }
 
   rebuildTerrain(highContrast: boolean) {
-    if (this.zone) this.terrain = makeTerrainTexture(this.zone, highContrast);
+    if (this.zone) this.terrain = makeTerrainArt(this.zone, highContrast);
   }
 
   forgetFragment(id: number) {
     this.fragSprites.delete(id);
+  }
+
+  private glowSprite(color: string) {
+    let g = this.glowSprites.get(color);
+    if (!g) {
+      g = makeGlowSprite(color, 32);
+      this.glowSprites.set(color, g);
+    }
+    return g;
   }
 
   render(s: RenderState, dt: number) {
@@ -153,44 +204,60 @@ export class Renderer {
     const cam = this.camera;
     const W = this.buffer.width;
     const H = this.buffer.height;
-    const theme = THEMES[zone.theme];
     const z = cam.zoom;
     const tx = Math.round(W / 2 - cam.x * z + s.shake.x);
     const ty = Math.round(H / 2 - cam.y * z + s.shake.y);
+    const ts = this.textScale();
 
     // --- fundo
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = theme.bg;
-    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    if (this.sky) ctx.drawImage(this.sky, 0, 0);
     this.drawBackground(s, W, H);
     if (s.highContrast) {
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.fillRect(0, 0, W, H);
     }
 
-    // --- campos ambientais
+    // --- campos
     ctx.setTransform(z, 0, 0, z, tx, ty);
     for (const f of zone.fields) {
-      ctx.fillStyle = 'rgba(85,215,232,0.08)';
+      ctx.fillStyle = 'rgba(85,215,232,0.07)';
       ctx.fillRect(f.x, f.y, f.w, f.h);
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawAmbientFields(s, tx, ty);
-    for (const f of zone.fields) {
-      const b = cam.toBuffer(f.x + f.w / 2, f.y);
-      const arrow = f.ax < 0 ? '<' : f.ax > 0 ? '>' : '';
-      const label = `${arrow}${arrow} ${f.label.toUpperCase()}`;
-      drawPixelText(ctx, label, b.x - textWidth(label) / 2, b.y + 4, 'rgba(127,230,224,0.85)', 1);
-    }
     this.drawDeviceFields(s, tx, ty);
 
     // --- terreno
     ctx.setTransform(z, 0, 0, z, tx, ty);
-    ctx.drawImage(this.terrain, 0, 0);
+    ctx.drawImage(this.terrain.tex, 0, 0);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const f of zone.fields) {
+      const b = cam.toBuffer(f.x + f.w / 2, f.y);
+      const arrow = f.ax < 0 ? '<' : f.ax > 0 ? '>' : '';
+      const label = `${arrow}${arrow} ${f.label.toUpperCase()}`;
+      drawPixelText(ctx, label, b.x - textWidth(label, ts) / 2, b.y + 4 * ts, 'rgba(160,240,232,0.95)', ts, '#03141a');
+    }
 
     // --- buraco negro
-    this.drawBlackHole(s, tx, ty);
+    const h = zone.blackHole;
+    const hf = this.hole.frames[Math.floor(s.time * 10) % this.hole.frames.length];
+    ctx.setTransform(z, 0, 0, z, tx, ty);
+    ctx.drawImage(hf.canvas, Math.round(h.x - hf.ox), Math.round(h.y - hf.oy));
+    const hc = this.hole.core;
+    ctx.drawImage(hc.canvas, Math.round(h.x - hc.ox), Math.round(h.y - hc.oy));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const cb = cam.toBuffer(h.x, h.y);
+    for (let i = 0; i < 30; i++) {
+      const r = h.absorbRadius + 6 + ((i * 7.3) % 26);
+      const a = s.time * (2.2 - r / 30) + i * 2.39;
+      ctx.fillStyle = i % 3 === 0 ? PAL.core : i % 3 === 1 ? '#e070c8' : '#ffffff';
+      ctx.fillRect(Math.round(cb.x + Math.cos(a) * r * z + s.shake.x), Math.round(cb.y + Math.sin(a) * r * z + s.shake.y), 1, 1);
+    }
+    if (s.buildMode) this.ringPx(cb.x, cb.y, h.attractRadius * z, 'rgba(176,104,232,0.5)', Math.floor(h.attractRadius * z * 0.9), true);
 
     // --- asteroide
     const a = zone.asteroid;
@@ -198,12 +265,17 @@ export class Renderer {
     const jig = s.crack > 0.6 ? (Math.random() - 0.5) * 1.2 : 0;
     ctx.setTransform(z, 0, 0, z, tx, ty);
     ctx.drawImage(ast.base.canvas, Math.round(a.x - ast.base.ox + jig), Math.round(a.y - ast.base.oy));
-    ctx.globalAlpha = Math.min(1, 0.45 + s.crack * 0.55 + Math.sin(s.time * 1.7) * 0.08 + (s.hoverAsteroid ? 0.2 : 0));
+    ctx.globalAlpha = Math.min(1, 0.6 + s.crack * 0.4 + Math.sin(s.time * 1.7) * 0.12 + (s.hoverAsteroid ? 0.2 : 0));
     ctx.drawImage(ast.glow.canvas, Math.round(a.x - ast.glow.ox + jig), Math.round(a.y - ast.glow.oy));
     ctx.globalAlpha = 1;
+    if (this.frame % 5 === 0 && this.particles.pool.length < this.particles.cap * 0.5) {
+      // brasas soltas pelas fissuras
+      const ang = Math.random() * Math.PI * 2;
+      this.particles.spawn({ x: a.x + Math.cos(ang) * a.r * 0.8, y: a.y + Math.sin(ang) * a.r * 0.8, vx: (Math.random() - 0.5) * 6, vy: -8 - Math.random() * 8, life: 1.6, color: Math.random() < 0.5 ? '#ff8a2a' : PAL.core, size: 1, gravity: -4 });
+    }
 
     // --- dispositivos
-    for (const d of s.sim.devices.values()) this.drawDevice(d, z, tx, ty, s.time, d === s.selected ? 1 : d.enabled ? 1 : 0.5);
+    for (const d of s.sim.devices.values()) this.drawDevice(d, z, tx, ty, s.time, d.enabled ? 1 : 0.5);
 
     // --- fragmentos
     const alpha = s.alpha;
@@ -223,14 +295,34 @@ export class Renderer {
       if (f.id === s.hoverFragment) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         const b = cam.toBuffer(x, y);
-        this.ringPx(b.x + s.shake.x, b.y + s.shake.y, (f.radius + 3) * z, PAL.cyan, 10);
+        this.ringPx(b.x + s.shake.x, b.y + s.shake.y, (f.radius + 3) * z, PAL.cyan, 14);
       }
     }
     if (this.frame % 90 === 0) {
       for (const id of this.fragSprites.keys()) if (!s.sim.fragments.has(id)) this.fragSprites.delete(id);
     }
 
+    // --- partículas
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (const p of this.particles.pool) {
+      const b = cam.toBuffer(p.x, p.y);
+      const sz = Math.max(1, Math.round(p.size * Math.min(2, z)));
+      ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(b.x + s.shake.x), Math.round(b.y + s.shake.y), sz, sz);
+    }
+    ctx.globalAlpha = 1;
+
+    // --- luzes (bloom aditivo); o horizonte de eventos continua negro por cima
+    this.drawGlow(s, tx, ty);
+    ctx.setTransform(z, 0, 0, z, tx, ty);
+    ctx.drawImage(hc.canvas, Math.round(h.x - hc.ox), Math.round(h.y - hc.oy));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // --- rochas de moldura em primeiro plano (fora do mapa) e vinheta
+    this.drawFrameRocks(W, H);
+    if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
+
     // --- feixe manual
     if (s.sim.grab && s.grabPointer) {
       const f = s.sim.fragments.get(s.sim.grab.fragId);
@@ -240,35 +332,25 @@ export class Renderer {
         const d = Math.hypot(s.grabPointer.x - f.body.position.x, s.grabPointer.y - f.body.position.y);
         const stretch = d / s.sim.grabReach();
         const col = stretch > 0.75 ? PAL.amber : PAL.cyan;
-        this.linePx(fp.x + s.shake.x, fp.y + s.shake.y, pp.x + s.shake.x, pp.y + s.shake.y, col, 2, Math.floor(s.time * 20));
-        this.ringPx(pp.x + s.shake.x, pp.y + s.shake.y, 3, col, 8);
+        this.linePx(fp.x + s.shake.x, fp.y + s.shake.y, pp.x + s.shake.x, pp.y + s.shake.y, col, 3, Math.floor(s.time * 20));
+        this.ringPx(pp.x + s.shake.x, pp.y + s.shake.y, 4, col, 12);
       }
     }
     if (s.trajectory) {
       for (let i = 0; i < s.trajectory.length; i += 2) {
         const p = cam.toBuffer(s.trajectory[i].x, s.trajectory[i].y);
-        ctx.fillStyle = i % 4 ? 'rgba(255,224,138,0.5)' : 'rgba(255,224,138,0.9)';
-        ctx.fillRect(Math.round(p.x + s.shake.x), Math.round(p.y + s.shake.y), 1, 1);
+        ctx.fillStyle = i % 4 ? 'rgba(255,224,138,0.5)' : 'rgba(255,224,138,0.95)';
+        ctx.fillRect(Math.round(p.x + s.shake.x), Math.round(p.y + s.shake.y), ts, ts);
       }
     }
 
-    // --- partículas
-    for (const p of this.particles.pool) {
-      const b = cam.toBuffer(p.x, p.y);
-      const sz = Math.max(1, Math.round(p.size * Math.min(1.5, z)));
-      ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.6);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(b.x + s.shake.x), Math.round(b.y + s.shake.y), sz, sz);
-    }
-    ctx.globalAlpha = 1;
-
-    // --- seleção, alças e fantasma
+    // --- seleção, fantasma e alças
     if (s.selected) this.drawSelection(s.selected, s);
     if (s.ghost) this.drawGhost(s.ghost, s, tx, ty);
-    for (const h of s.handles) {
-      const b = cam.toBuffer(h.x, h.y);
-      if (h.kind === 'rotate') {
-        this.ringPx(b.x, b.y, h.r * z, PAL.core, 16);
+    for (const hd of s.handles) {
+      const b = cam.toBuffer(hd.x, hd.y);
+      if (hd.kind === 'rotate') {
+        this.ringPx(b.x, b.y, hd.r * z + 1, PAL.core, 20);
         ctx.fillStyle = PAL.core;
         ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) - 1, 3, 3);
       }
@@ -278,14 +360,14 @@ export class Renderer {
     for (const fl of s.floaters) {
       const b = cam.toBuffer(fl.x, fl.y);
       const t = 1 - fl.life / fl.max;
-      ctx.globalAlpha = Math.min(1, fl.life / fl.max * 2.5);
-      drawPixelText(ctx, fl.text, b.x - textWidth(fl.text) / 2, b.y - 10 - t * 14, fl.color, 1);
+      ctx.globalAlpha = Math.min(1, (fl.life / fl.max) * 2.5);
+      drawPixelText(ctx, fl.text, b.x - textWidth(fl.text, ts) / 2, b.y - 10 * ts - t * 16 * ts, fl.color, ts);
     }
     ctx.globalAlpha = 1;
     if (s.hint) {
       const b = cam.toBuffer(s.hint.x, s.hint.y);
       const bob = Math.round(Math.sin(s.time * 4) * 2);
-      drawPixelText(ctx, s.hint.text, b.x - textWidth(s.hint.text) / 2, b.y + bob, PAL.core, 1);
+      drawPixelText(ctx, s.hint.text, b.x - textWidth(s.hint.text, ts) / 2, b.y + bob, PAL.core, ts, '#1a0c2a');
     }
 
     // --- blit
@@ -297,6 +379,8 @@ export class Renderer {
     const bg = this.bg!;
     const ctx = this.bctx;
     const cam = this.camera;
+    const zw = this.zone!.width;
+    const zh = this.zone!.height;
     const tile = (img: HTMLCanvasElement, par: number) => {
       const tw = img.width;
       const th = img.height;
@@ -304,20 +388,109 @@ export class Renderer {
       const oy = -(((cam.y * par) % th) + th) % th;
       for (let y = Math.floor(oy); y < H; y += th) for (let x = Math.floor(ox); x < W; x += tw) ctx.drawImage(img, x, y);
     };
-    tile(bg.far, 0.04);
-    const ns = bg.nebulaScale;
-    const z = cam.zoom;
-    const nz = ns * Math.max(0.5, Math.min(1.2, z));
-    const nx = Math.round(W / 2 - (cam.x * 0.35 + this.zone!.width * 0.65 * 0.5) * (nz / ns));
-    const ny = Math.round(H / 2 - (cam.y * 0.35 + this.zone!.height * 0.65 * 0.5) * (nz / ns));
-    ctx.drawImage(bg.nebula, nx - 20 * nz, ny - 15 * nz, bg.nebula.width * nz, bg.nebula.height * nz);
-    for (const p of bg.planets) {
-      const bx = Math.round(W / 2 + (p.x - this.zone!.width / 2) * 0.55 - (cam.x - this.zone!.width / 2) * p.par);
-      const by = Math.round(H / 2 + (p.y - this.zone!.height / 2) * 0.55 - (cam.y - this.zone!.height / 2) * p.par);
-      ctx.drawImage(p.sprite.canvas, bx - p.sprite.ox, by - p.sprite.oy);
+    tile(bg.far, 0.03);
+    // estrelas cintilantes
+    for (const t of bg.twinkles) {
+      const v = 0.5 + 0.5 * Math.sin(s.time * 1.3 + t.p);
+      if (v < 0.35) continue;
+      const x = Math.round(t.x * W);
+      const y = Math.round(t.y * H);
+      ctx.globalAlpha = v;
+      ctx.fillStyle = t.c;
+      ctx.fillRect(x, y, 1, 1);
+      if (v > 0.85) {
+        ctx.globalAlpha = (v - 0.85) * 4;
+        ctx.fillRect(x - 1, y, 3, 1);
+        ctx.fillRect(x, y - 1, 1, 3);
+      }
     }
-    tile(bg.near, 0.12);
-    void s;
+    ctx.globalAlpha = 1;
+    // projeção paralaxe: posição na tela de um ponto do "céu" com fator par
+    const par = (x: number, y: number, p: number) => ({
+      x: Math.round(W / 2 + (x - zw / 2) * 0.9 - (cam.x - zw / 2) * p),
+      y: Math.round(H / 2 + (y - zh / 2) * 0.9 - (cam.y - zh / 2) * p),
+    });
+    const ns = bg.nebulaScale;
+    const np = par(-300, -200, 0.18);
+    ctx.drawImage(bg.nebula, np.x, np.y, bg.nebula.width * ns * 0.9, bg.nebula.height * ns * 0.9);
+    const gp = par(bg.galaxyPos.x, bg.galaxyPos.y, 0.06);
+    ctx.drawImage(bg.galaxy.canvas, gp.x - bg.galaxy.ox, gp.y - bg.galaxy.oy);
+    for (const p of bg.planets) {
+      const q = par(p.x, p.y, p.par);
+      ctx.drawImage(p.sprite.canvas, q.x - p.sprite.ox, q.y - p.sprite.oy);
+    }
+    tile(bg.near, 0.1);
+    for (const r of bg.farRocks) {
+      const q = par(r.x, r.y, r.par);
+      ctx.drawImage(r.sprite.canvas, q.x - r.sprite.ox, q.y - r.sprite.oy);
+    }
+  }
+
+  private drawFrameRocks(W: number, H: number) {
+    const ctx = this.bctx;
+    const cam = this.camera;
+    const z = cam.zoom;
+    for (const r of this.bg!.frameRocks) {
+      const bx = W / 2 + (r.x - cam.x) * z * r.par;
+      const by = H / 2 + (r.y - cam.y) * z * r.par;
+      const sw = r.sprite.canvas.width * z;
+      const sh = r.sprite.canvas.height * z;
+      if (bx + sw < 0 || by + sh < 0 || bx - sw > W || by - sh > H) continue;
+      ctx.drawImage(r.sprite.canvas, Math.round(bx - r.sprite.ox * z), Math.round(by - r.sprite.oy * z), Math.round(sw), Math.round(sh));
+    }
+  }
+
+  private drawGlow(s: RenderState, tx: number, ty: number) {
+    const g = this.gctx;
+    const gw = this.glow.width;
+    const gh = this.glow.height;
+    const z = this.camera.zoom;
+    const k = 1 / GLOW_SCALE;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, gw, gh);
+    g.globalCompositeOperation = 'lighter';
+    g.imageSmoothingEnabled = true;
+    const zone = this.zone!;
+    // cristais do terreno
+    g.globalAlpha = 0.85 + Math.sin(s.time * 0.8) * 0.1;
+    g.drawImage(this.terrain!.glow, tx * k, ty * k, (zone.width * z) * k, (zone.height * z) * k);
+    const put = (wx: number, wy: number, color: string, worldSize: number, alpha: number) => {
+      const sz = worldSize * z * k;
+      if (sz < 0.5) return;
+      const x = (tx + wx * z) * k;
+      const y = (ty + wy * z) * k;
+      if (x < -sz || y < -sz || x > gw + sz || y > gh + sz) return;
+      g.globalAlpha = alpha;
+      g.drawImage(this.glowSprite(color), x - sz / 2, y - sz / 2, sz, sz);
+    };
+    const a = zone.asteroid;
+    put(a.x, a.y, '#ff7a2a', a.r * 4, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
+    const h = zone.blackHole;
+    put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4, 0.38);
+    put(h.x, h.y, '#ff9a5a', (h.absorbRadius + 6) * 2.2, 0.22);
+    for (const f of s.sim.fragments.values()) put(f.body.position.x, f.body.position.y, fragmentGlowColor(f.type), 26, 0.32);
+    for (const d of s.sim.devices.values()) {
+      if (!d.enabled) continue;
+      const art = deviceArt(d.type);
+      const c = Math.cos(d.angle);
+      const sn = Math.sin(d.angle);
+      for (const l of art.lights) {
+        const wx = d.x + l.x * c - l.y * sn;
+        const wy = d.y + l.x * sn + l.y * c;
+        put(wx, wy, l.color, l.size * (1 + d.rt.flash), 0.35 + d.rt.flash * 0.5);
+      }
+    }
+    g.globalAlpha = 1;
+    const b = this.bctx;
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    b.globalCompositeOperation = 'lighter';
+    b.imageSmoothingEnabled = true;
+    b.globalAlpha = s.reduceGlow ? 0.45 : 1;
+    b.drawImage(this.glow, 0, 0, gw * GLOW_SCALE, gh * GLOW_SCALE);
+    b.globalAlpha = 1;
+    b.imageSmoothingEnabled = false;
+    b.globalCompositeOperation = 'source-over';
   }
 
   private drawAmbientFields(s: RenderState, tx: number, ty: number) {
@@ -328,7 +501,7 @@ export class Renderer {
       const dx = f.ax / len;
       const dy = f.ay / len;
       const n = Math.max(10, Math.floor((f.w * f.h) / 900));
-      ctx.fillStyle = 'rgba(127,230,224,0.75)';
+      ctx.fillStyle = 'rgba(127,230,224,0.8)';
       for (let i = 0; i < n; i++) {
         const seedX = (i * 73.13) % 1;
         const seedY = (i * 37.71) % 1;
@@ -351,12 +524,12 @@ export class Renderer {
       const show = s.buildMode || d === s.selected;
       if (d.type === 'fan') {
         const L = FAN_LENGTH * mods.fieldRadiusMul;
-        ctx.fillStyle = 'rgba(191,232,242,0.65)';
-        for (let k = 0; k < 9; k++) {
+        ctx.fillStyle = 'rgba(200,240,250,0.7)';
+        for (let k = 0; k < 10; k++) {
           const lane = ((k * 0.37) % 1) * 30 - 15;
           const t = (s.time * 1.6 + k * 0.27) % 1;
           const lx = 10 + t * L;
-          for (let q = 0; q < 3; q++) {
+          for (let q = 0; q < 4; q++) {
             const px = d.x + c * (lx - q * 3) - sn * lane;
             const py = d.y + sn * (lx - q * 3) + c * lane;
             ctx.fillRect(Math.round(tx + px * z), Math.round(ty + py * z), 1, 1);
@@ -365,13 +538,16 @@ export class Renderer {
         if (show) this.polyPx(transformPoly([{ x: 7, y: -18 }, { x: 7 + L, y: -18 }, { x: 7 + L, y: 18 }, { x: 7, y: 18 }], d, d.angle), 'rgba(85,215,232,0.5)', tx, ty, 4);
       } else if (d.type === 'lift') {
         const Hh = LIFT_HEIGHT * mods.fieldRadiusMul;
-        ctx.fillStyle = 'rgba(85,215,232,0.07)';
         ctx.save();
         ctx.setTransform(z * c, z * sn, -z * sn, z * c, tx + z * d.x, ty + z * d.y);
+        const gr = ctx.createLinearGradient(0, -4, 0, -4 - Hh);
+        gr.addColorStop(0, 'rgba(85,215,232,0.22)');
+        gr.addColorStop(1, 'rgba(85,215,232,0)');
+        ctx.fillStyle = gr;
         ctx.fillRect(-LIFT_WIDTH / 2, -4 - Hh, LIFT_WIDTH, Hh);
         ctx.restore();
-        ctx.fillStyle = 'rgba(160,240,255,0.7)';
-        for (let k = 0; k < 10; k++) {
+        ctx.fillStyle = 'rgba(180,245,255,0.8)';
+        for (let k = 0; k < 12; k++) {
           const lane = ((k * 0.61) % 1) * 26 - 13;
           const t = (s.time * 0.5 + k * 0.17) % 1;
           const ly = -4 - t * Hh;
@@ -389,47 +565,16 @@ export class Renderer {
           );
       } else if (d.type === 'attractor' || d.type === 'repulsor') {
         const R = FIELD_RADIUS * mods.fieldRadiusMul;
-        const col = d.type === 'attractor' ? 'rgba(85,215,232,0.55)' : 'rgba(255,122,154,0.55)';
+        const col = d.type === 'attractor' ? 'rgba(85,215,232,0.6)' : 'rgba(255,122,154,0.6)';
+        const b = this.camera.toBuffer(d.x, d.y);
         for (let k = 0; k < 3; k++) {
           let t = (s.time * 0.45 + k / 3) % 1;
           if (d.type === 'attractor') t = 1 - t;
-          const b = this.camera.toBuffer(d.x, d.y);
           this.ringPx(b.x, b.y, R * t * z, col, Math.max(10, Math.floor(R * t * z * 0.6)));
         }
-        if (show) {
-          const b = this.camera.toBuffer(d.x, d.y);
-          this.ringPx(b.x, b.y, R * z, col, Math.floor(R * z * 1.2), true);
-        }
+        if (show) this.ringPx(b.x, b.y, R * z, col, Math.floor(R * z * 1.2), true);
       }
     }
-  }
-
-  private drawBlackHole(s: RenderState, tx: number, ty: number) {
-    const ctx = this.bctx;
-    const z = this.camera.zoom;
-    const h = this.zone!.blackHole;
-    const art = this.hole!;
-    const spin = (spr: Sprite, a: number) => {
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
-      ctx.setTransform(z * c, z * sn, -z * sn, z * c, tx + z * h.x, ty + z * h.y);
-      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
-    };
-    spin(art.halo, -s.time * 0.15);
-    spin(art.ring, s.time * 0.6);
-    ctx.setTransform(z, 0, 0, z, tx, ty);
-    ctx.drawImage(art.core.canvas, Math.round(h.x - art.core.ox), Math.round(h.y - art.core.oy));
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const cb = this.camera.toBuffer(h.x, h.y);
-    for (let i = 0; i < 26; i++) {
-      const r = h.absorbRadius + 5 + ((i * 7.3) % 15);
-      const a = s.time * (1.6 - r / 40) + i * 2.39;
-      const x = cb.x + Math.cos(a) * r * z;
-      const y = cb.y + Math.sin(a) * r * z * 0.92;
-      ctx.fillStyle = i % 3 === 0 ? PAL.core : i % 3 === 1 ? PAL.vortex : '#FF9A5A';
-      ctx.fillRect(Math.round(x + s.shake.x), Math.round(y + s.shake.y), 1, 1);
-    }
-    if (s.buildMode) this.ringPx(cb.x, cb.y, h.attractRadius * z, 'rgba(157,104,232,0.45)', Math.floor(h.attractRadius * z * 0.9), true);
   }
 
   drawDevice(d: Device, z: number, tx: number, ty: number, time: number, alpha: number) {
@@ -485,7 +630,7 @@ export class Renderer {
       rt: { flash: 0, open: 0, swing: 0 },
       pivotWorld: DEVICES[g.type].pivot ? transformPoly([DEVICES[g.type].pivot!], g, g.angle)[0] : null,
     } as unknown as Device;
-    this.drawDevice(fake, z, tx, ty, s.time, 0.7);
+    this.drawDevice(fake, z, tx, ty, s.time, 0.75);
     const col = g.valid ? PAL.ok : PAL.bad;
     for (const p of footprint(g.type, g.params).map((q) => transformPoly(q, g, g.angle))) this.polyPx(p, col, tx, ty, 0);
     const def = DEVICES[g.type];
@@ -522,8 +667,9 @@ export class Renderer {
     const sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
     let i = phase;
-    for (let guard = 0; guard < 4000; guard++) {
-      if (!dash || Math.floor(i / dash) % 2 === 0) ctx.fillRect(x0, y0, 1, 1);
+    const w = this.textScale();
+    for (let guard = 0; guard < 6000; guard++) {
+      if (!dash || Math.floor(i / dash) % 2 === 0) ctx.fillRect(x0, y0, w, w);
       i++;
       if (x0 === x1 && y0 === y1) break;
       const e2 = 2 * err;
@@ -551,10 +697,11 @@ export class Renderer {
     const ctx = this.bctx;
     ctx.fillStyle = color;
     const steps = Math.max(8, n);
+    const w = this.textScale();
     for (let i = 0; i < steps; i++) {
       if (dotted && i % 2) continue;
       const a = (i / steps) * Math.PI * 2;
-      ctx.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
+      ctx.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), w, w);
     }
   }
 }

@@ -73,6 +73,8 @@ const { chromium, devices } = require('playwright');
   for (let i = 0; i < 4; i++) { await mp.touchscreen.tap(ma.x, ma.y); await mp.waitForTimeout(450); }
   await mp.waitForTimeout(800);
   const mfrags = await mp.evaluate(() => window.meteorMill.sim.fragments.size);
+  await mp.locator('.shop-toggle').tap();
+  await mp.waitForTimeout(200);
   await mp.locator('.shop-card').first().tap();
   await mp.waitForTimeout(300);
   await mp.screenshot({ path: `${out}-m-ghost.png` });

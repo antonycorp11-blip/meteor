@@ -1,15 +1,15 @@
-import { rot, type Poly } from '../core/geometry';
+import type { Poly, Vec } from '../core/geometry';
 import { Rng, hash2 } from '../core/rng';
 import { ARM_LENGTH, DEVICES, SENSOR_SIZE } from '../machines/catalog';
 import type { DeviceType } from '../machines/types';
-import { FRAGMENT_TYPES, type FragmentTypeId } from '../physics/fragmentTypes';
+import type { FragmentTypeId } from '../physics/fragmentTypes';
 import type { ZoneData } from '../world/types';
 import { terrainPolys } from '../world/Terrain';
-import { PAL, THEMES, hexToRgb, mix, type Theme } from './palette';
+import { BRASS, METAL, PAL, THEMES, hexToRgb, mix, ramp, type Theme } from './palette';
 import { PixelGrid, makeCanvas, type Sprite } from './PixelSprite';
 
 // ---------------------------------------------------------------------------
-// Ruído
+// Ruído e utilidades
 // ---------------------------------------------------------------------------
 
 function smooth(t: number) {
@@ -28,14 +28,93 @@ export function valueNoise(x: number, y: number, seed: number) {
   return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
 }
 
+function fbm(x: number, y: number, seed: number, oct = 4) {
+  let s = 0;
+  let a = 0.5;
+  let f = 1;
+  let n = 0;
+  for (let i = 0; i < oct; i++) {
+    s += valueNoise(x * f, y * f, seed + i * 17) * a;
+    n += a;
+    a *= 0.5;
+    f *= 2.03;
+  }
+  return s / n;
+}
+
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 export const bayer = (x: number, y: number) => BAYER4[(y & 3) * 4 + (x & 3)];
 
+/** Transformada de distância chanfrada (3-4) em pixels. */
+function chamfer(mask: Uint8Array, W: number, H: number, target: 0 | 1): Float32Array {
+  const d = new Float32Array(W * H);
+  const INF = 1e7;
+  for (let i = 0; i < W * H; i++) d[i] = mask[i] === target ? INF : 0;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      let v = d[i];
+      if (v === 0) continue;
+      if (x > 0) v = Math.min(v, d[i - 1] + 3);
+      if (y > 0) {
+        v = Math.min(v, d[i - W] + 3);
+        if (x > 0) v = Math.min(v, d[i - W - 1] + 4);
+        if (x < W - 1) v = Math.min(v, d[i - W + 1] + 4);
+      }
+      d[i] = v;
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      const i = y * W + x;
+      let v = d[i];
+      if (v === 0) continue;
+      if (x < W - 1) v = Math.min(v, d[i + 1] + 3);
+      if (y < H - 1) {
+        v = Math.min(v, d[i + W] + 3);
+        if (x < W - 1) v = Math.min(v, d[i + W + 1] + 4);
+        if (x > 0) v = Math.min(v, d[i + W - 1] + 4);
+      }
+      d[i] = v;
+    }
+  }
+  for (let i = 0; i < W * H; i++) d[i] = d[i] >= INF ? 999 : d[i] / 3;
+  return d;
+}
+
+const LIGHT = { x: -0.55, y: -0.83 };
+
+/** Esboço de um cristal hexagonal (prisma) de pixels. */
+function drawCrystal(set: (x: number, y: number, c: string) => void, cx: number, cy: number, h: number, w: number, lean: number, cols: [string, string, string, string]) {
+  for (let j = 0; j < h; j++) {
+    const t = j / Math.max(1, h - 1);
+    const half = j < 2 ? Math.max(0.5, (j + 0.5) * (w / 4)) : w / 2;
+    const ox = cx + lean * (h - j);
+    for (let i = -Math.ceil(half); i <= Math.ceil(half); i++) {
+      if (Math.abs(i) > half + 0.2) continue;
+      const side = i < 0 ? 2 : i === 0 ? 3 : 1;
+      let c = cols[side];
+      if (j === 0) c = cols[3];
+      if (t > 0.85) c = cols[0];
+      set(Math.round(ox + i), Math.round(cy - h + j), c);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Terreno
+// Terreno: ilhas de rocha com silhueta orgânica, blocos, borda iluminada,
+// gotejamentos pendentes e cristais luminosos.
 // ---------------------------------------------------------------------------
 
-export function makeTerrainTexture(zone: ZoneData, highContrast = false): HTMLCanvasElement {
+export interface TerrainArt {
+  tex: HTMLCanvasElement;
+  /** brilho dos cristais (1/4 da resolução do mundo) */
+  glow: HTMLCanvasElement;
+}
+
+export const GLOW_SCALE = 4;
+
+export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt {
   const theme = THEMES[zone.theme];
   const W = zone.width;
   const H = zone.height;
@@ -52,73 +131,155 @@ export function makeTerrainTexture(zone: ZoneData, highContrast = false): HTMLCa
   const src = img.data;
   const mask = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) mask[i] = src[i * 4 + 3] >= 128 ? 1 : 0;
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : mask[y * W + x]);
-  const seed = zone.id * 131;
-  const rocks = theme.rock.map(hexToRgb);
-  const edge = hexToRgb(highContrast ? '#C8D0F0' : theme.rockEdge);
-  const line = hexToRgb(theme.rockLine);
-  const speck = hexToRgb(theme.speck);
-  const crack = hexToRgb(mix(theme.rock[0], theme.rockLine, 0.6));
-  const out = new Uint8ClampedArray(W * H * 4);
+  const seed = zone.id * 131 + 7;
 
-  // fissuras pontuais: caminhadas aleatórias curtas dentro da rocha
-  const crackMask = new Uint8Array(W * H);
-  const rng = new Rng(seed + 7);
-  const polys = terrainPolys(zone);
-  for (const p of polys) {
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const q of p) {
-      minX = Math.min(minX, q.x);
-      maxX = Math.max(maxX, q.x);
-      minY = Math.min(minY, q.y);
-      maxY = Math.max(maxY, q.y);
-    }
-    const area = (maxX - minX) * (maxY - minY);
-    const n = Math.floor(area / 5000);
-    for (let k = 0; k < n; k++) {
-      let x = Math.floor(rng.range(minX + 6, maxX - 6));
-      let y = Math.floor(rng.range(minY + 10, maxY - 6));
-      let dir = rng.next() * Math.PI * 2;
-      const len = rng.int(6, 18);
-      for (let s = 0; s < len; s++) {
-        if (at(x, y) && at(x + 2, y) && at(x - 2, y) && at(x, y + 2) && at(x, y - 2)) crackMask[y * W + x] = 1;
-        dir += rng.range(-0.7, 0.7);
-        x += Math.round(Math.cos(dir));
-        y += Math.round(Math.sin(dir));
+  // --- silhueta visual: erosão nas laterais, saliências e gotejamentos embaixo
+  const dIn = chamfer(mask, W, H, 1);
+  const dOut = chamfer(mask, W, H, 0);
+  const at = (f: Float32Array, x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 999 : f[y * W + x]);
+  const vis = new Uint8Array(mask);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (mask[i]) {
+        const d = dIn[i];
+        if (d > 4) continue;
+        // normal para fora = −∇d
+        const nx = at(dIn, x - 1, y) - at(dIn, x + 1, y);
+        const ny = at(dIn, x, y - 1) - at(dIn, x, y + 1);
+        const l = Math.hypot(nx, ny) || 1;
+        const oy = ny / l;
+        if (oy < -0.6) continue; // topos permanecem lisos (superfície de apoio)
+        const er = Math.max(0, fbm(x / 7, y / 7, seed, 3) - 0.42) * 7;
+        if (d < er) vis[i] = 0;
+      } else {
+        const d = dOut[i];
+        if (d > 14) continue;
+        const nx = at(dOut, x + 1, y) - at(dOut, x - 1, y);
+        const ny = at(dOut, x, y + 1) - at(dOut, x, y - 1);
+        const l = Math.hypot(nx, ny) || 1;
+        const ox = nx / l;
+        const oy = ny / l;
+        if (oy > 0.65) {
+          // gotejamentos sob a rocha
+          const n = valueNoise(x / 3.2, 3.3, seed + 5);
+          const len = Math.max(0, n - 0.5) * 30 + (hash2(x, 9, seed) > 0.93 ? 4 : 0);
+          if (d < len) vis[i] = 1;
+        } else if (Math.abs(ox) > 0.55) {
+          const b = Math.max(0, fbm(x / 6, y / 6, seed + 3, 3) - 0.55) * 7;
+          if (d < b) vis[i] = 1;
+        }
       }
     }
   }
 
+  // --- sombreamento
+  const dv = chamfer(vis, W, H, 1);
+  const rock = theme.rock.map(hexToRgb);
+  const line = hexToRgb(theme.rockLine);
+  const rim = hexToRgb(highContrast ? '#e8e4ff' : theme.rim);
+  const dust = hexToRgb(theme.dust);
+  const out = new Uint8ClampedArray(W * H * 4);
+  const S = 15; // tamanho médio dos blocos
+  const seedAt = (cx: number, cy: number) => ({
+    x: (cx + 0.15 + hash2(cx, cy, seed + 11) * 0.7) * S,
+    y: (cy + 0.15 + hash2(cx, cy, seed + 12) * 0.7) * S,
+  });
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      if (!mask[y * W + x]) continue;
-      const i = (y * W + x) * 4;
+      const i = y * W + x;
+      if (!vis[i]) continue;
+      const d = dv[i];
       let c: number[];
-      const exposedUp = !at(x, y - 1);
-      const isEdge = exposedUp || !at(x, y + 1) || !at(x - 1, y) || !at(x + 1, y);
-      if (isEdge) c = line;
-      else if (!at(x, y - 2) || !at(x, y - 3)) c = edge;
-      else if (!at(x - 2, y) || !at(x + 2, y) || !at(x, y + 2)) c = rocks[0];
-      else if (crackMask[y * W + x]) c = crack;
+      if (d < 1.2) c = line;
       else {
-        const n = valueNoise(x / 16, y / 13, seed) * 0.75 + valueNoise(x / 5, y / 5, seed + 1) * 0.25;
-        const t = n + (bayer(x, y) - 0.5) * 0.1;
-        c = t < 0.36 ? rocks[0] : t < 0.7 ? rocks[1] : rocks[2];
-        // minério pontual
-        if (hash2(x >> 1, y >> 1, seed + 3) > 0.9965) c = speck;
+        // normal aproximada perto da borda
+        let facing = 0;
+        let oy = 0;
+        if (d < 7) {
+          const nx = at(dv, x - 1, y) - at(dv, x + 1, y);
+          const ny = at(dv, x, y - 1) - at(dv, x, y + 1);
+          const l = Math.hypot(nx, ny) || 1;
+          facing = (nx / l) * LIGHT.x + (ny / l) * LIGHT.y;
+          oy = ny / l;
+        }
+        // voronoi: blocos de pedra
+        const gx = Math.floor(x / S);
+        const gy = Math.floor(y / S);
+        let d1 = 1e9;
+        let d2 = 1e9;
+        let best = { x: 0, y: 0 };
+        let bid = 0;
+        for (let j = -1; j <= 1; j++)
+          for (let k = -1; k <= 1; k++) {
+            const s = seedAt(gx + k, gy + j);
+            const dd = (x - s.x) ** 2 + (y - s.y) ** 2;
+            if (dd < d1) {
+              d2 = d1;
+              d1 = dd;
+              best = s;
+              bid = (gx + k) * 7919 + (gy + j);
+            } else if (dd < d2) d2 = dd;
+          }
+        const edge = Math.sqrt(d2) - Math.sqrt(d1);
+        const cellShade = hash2(bid, 3, seed) * 0.3 - 0.12;
+        const inLight = ((x - best.x) * LIGHT.x + (y - best.y) * LIGHT.y) / S;
+        const depth = Math.min(1, d / 70);
+        let t = 0.62 + cellShade + inLight * 0.35 - depth * 0.32 + (fbm(x / 70, y / 55, seed + 50, 3) - 0.5) * 0.45 + (bayer(x, y) - 0.5) * 0.12;
+        if (edge < 1.3) t -= 0.3;
+        else if (edge < 2.4 && inLight > 0) t += 0.08;
+        if (d < 5 && facing > 0.3) t += 0.35 * (1 - d / 5) + 0.1;
+        if (d < 6 && facing < -0.35) t -= 0.25;
+        const idx = Math.max(0, Math.min(5, Math.floor(t * 6)));
+        c = rock[idx];
+        if (d < 3.2 && facing > 0.45) c = rim;
+        if (d < 2.6 && oy < -0.75 && hash2(x >> 1, y, seed + 21) > 0.35) c = dust;
       }
-      out[i] = c[0];
-      out[i + 1] = c[1];
-      out[i + 2] = c[2];
-      out[i + 3] = 255;
+      const o = i * 4;
+      out[o] = c[0];
+      out[o + 1] = c[1];
+      out[o + 2] = c[2];
+      out[o + 3] = 255;
     }
   }
   img.data.set(out);
   ctx.putImageData(img, 0, 0);
-  return canvas;
+
+  // --- cristais embutidos (com brilho)
+  const glow = makeCanvas(Math.ceil(W / GLOW_SCALE), Math.ceil(H / GLOW_SCALE));
+  const gctx = glow.getContext('2d')!;
+  const rng = new Rng(seed + 77);
+  let area = 0;
+  for (let i = 0; i < W * H; i++) area += vis[i];
+  const nClusters = Math.floor(area / 16000);
+  const setPx = (px: number, py: number, col: string) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return;
+    ctx.fillStyle = col;
+    ctx.fillRect(px, py, 1, 1);
+  };
+  let placed = 0;
+  for (let tries = 0; tries < nClusters * 30 && placed < nClusters; tries++) {
+    const x = rng.int(4, W - 5);
+    const y = rng.int(8, H - 5);
+    const i = y * W + x;
+    if (!vis[i]) continue;
+    const d = dv[i];
+    if (d < 4 || d > 34) continue;
+    placed++;
+    const n = rng.int(2, 4);
+    for (let k = 0; k < n; k++) {
+      drawCrystal(setPx, x + rng.int(-4, 4), y + rng.int(-1, 3), rng.int(4, 8), rng.int(2, 4), rng.range(-0.3, 0.3), theme.crystal);
+    }
+    const gx = x / GLOW_SCALE;
+    const gy = y / GLOW_SCALE;
+    const grad = gctx.createRadialGradient(gx, gy, 0, gx, gy, 7);
+    const [r, g, b] = hexToRgb(theme.crystal[2]);
+    grad.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    gctx.fillStyle = grad;
+    gctx.fillRect(gx - 8, gy - 8, 16, 16);
+  }
+  return { tex: canvas, glow };
 }
 
 // ---------------------------------------------------------------------------
@@ -131,153 +292,213 @@ export interface AsteroidArt {
 }
 
 export function makeAsteroid(r: number, seed: number): AsteroidArt {
-  const pad = 6;
+  const pad = 8;
   const size = r * 2 + pad * 2;
   const g = new PixelGrid(size, size, size / 2, size / 2);
   const glow = new PixelGrid(size, size, size / 2, size / 2);
   const rng = new Rng(seed);
-  const radiusAt = (a: number) => r * (1 + 0.05 * (valueNoise(Math.cos(a) * 2 + 5, Math.sin(a) * 2 + 5, seed) - 0.5) * 2);
-  const c0 = '#3A2C3E';
-  const c1 = '#4E3C50';
-  const c2 = '#665066';
-  const c3 = '#7E6A7E';
+  const ramp6 = ['#140c18', '#24152a', '#36203a', '#4a2e4a', '#62405c', '#7e5a70'];
+  const radiusAt = (a: number) => r * (1 + 0.07 * (fbm(Math.cos(a) * 1.6 + 5, Math.sin(a) * 1.6 + 5, seed, 3) - 0.5) * 2);
+  const S = 9;
   for (let y = -r - pad; y < r + pad; y++) {
     for (let x = -r - pad; x < r + pad; x++) {
       const px = x + 0.5;
       const py = y + 0.5;
-      const d = Math.hypot(px, py);
+      const dd = Math.hypot(px, py);
       const a = Math.atan2(py, px);
-      if (d > radiusAt(a)) continue;
-      const light = (-px * 0.6 - py * 0.8) / r; // luz do canto superior esquerdo
-      const n = valueNoise(px / 5 + 20, py / 5, seed) - 0.5;
-      const t = light * 0.55 + n * 0.5 + (bayer(x, y) - 0.5) * 0.15;
-      const col = t > 0.35 ? c3 : t > 0.02 ? c2 : t > -0.3 ? c1 : c0;
-      g.set(x + g.ox, y + g.oy, col);
+      const R = radiusAt(a);
+      if (dd > R) continue;
+      // esfera iluminada de cima/esquerda + blocos
+      const nz = Math.sqrt(Math.max(0, 1 - (dd / R) ** 2));
+      const lambert = (px / R) * LIGHT.x + (py / R) * LIGHT.y + nz * 0.6;
+      const gx = Math.floor((x + 100) / S);
+      const gy = Math.floor((y + 100) / S);
+      let d1 = 1e9;
+      let d2 = 1e9;
+      let bid = 0;
+      for (let j = -1; j <= 1; j++)
+        for (let k = -1; k <= 1; k++) {
+          const sx = (gx + k + 0.2 + hash2(gx + k, gy + j, seed) * 0.6) * S - 100;
+          const sy = (gy + j + 0.2 + hash2(gx + k, gy + j, seed + 1) * 0.6) * S - 100;
+          const q = (x - sx) ** 2 + (y - sy) ** 2;
+          if (q < d1) {
+            d2 = d1;
+            d1 = q;
+            bid = (gx + k) * 31 + gy + j;
+          } else if (q < d2) d2 = q;
+        }
+      const edge = Math.sqrt(d2) - Math.sqrt(d1);
+      let t = 0.25 + lambert * 0.45 + (hash2(bid, 1, seed) - 0.5) * 0.18 + (bayer(x, y) - 0.5) * 0.12;
+      if (edge < 1.2) t -= 0.2;
+      if (dd > R - 1.3) t = 0;
+      g.set(x + g.ox, y + g.oy, ramp6[Math.max(0, Math.min(5, Math.floor(t * 6)))]);
     }
   }
   // crateras
-  for (let k = 0; k < 9; k++) {
+  for (let k = 0; k < 7; k++) {
     const a = rng.next() * Math.PI * 2;
-    const dd = rng.range(0, r * 0.72);
-    const cr = rng.range(3, r * 0.2);
+    const dd = rng.range(0, r * 0.6);
+    const cr = rng.range(3, r * 0.17);
     const cx = Math.cos(a) * dd;
     const cy = Math.sin(a) * dd;
     g.circle(cx, cy, cr, (x, y) => {
-      const dx = x - cx;
-      const dy = y - cy;
-      const rim = (dx * 0.6 + dy * 0.8) / cr; // borda iluminada embaixo/direita do interior
-      return rim > 0.45 ? c2 : c0;
+      const rimv = ((x - cx) * -LIGHT.x + (y - cy) * -LIGHT.y) / cr;
+      return rimv > 0.45 ? ramp6[4] : rimv < -0.3 ? ramp6[0] : ramp6[1];
     });
-    g.circle(cx + cr * 0.15, cy + cr * 0.15, cr * 0.45, '#2E2232');
   }
-  // fissuras luminosas (camada de brilho separada para pulsar)
-  for (let k = 0; k < 6; k++) {
+  // fissuras luminosas e minério hexagonal (camada de brilho separada para pulsar)
+  for (let k = 0; k < 7; k++) {
     let a = rng.next() * Math.PI * 2;
-    let x = Math.cos(a) * r * 0.15;
-    let y = Math.sin(a) * r * 0.15;
-    const len = rng.int(Math.floor(r * 0.5), Math.floor(r * 0.95));
+    let x = Math.cos(a) * r * 0.1;
+    let y = Math.sin(a) * r * 0.1;
+    const len = rng.int(Math.floor(r * 0.55), Math.floor(r * 1.0));
     for (let s = 0; s < len; s++) {
       if (Math.hypot(x, y) > r - 3) break;
-      g.set(Math.floor(x) + g.ox, Math.floor(y) + g.oy, '#7A2E22');
-      glow.set(Math.floor(x) + glow.ox, Math.floor(y) + glow.oy, s % 5 === 0 ? PAL.core : '#FF8A3A');
-      if (s % 3 === 0) glow.set(Math.floor(x) + glow.ox + 1, Math.floor(y) + glow.oy, '#FF8A3A', 150);
-      a += rng.range(-0.5, 0.5);
+      const fx = Math.floor(x);
+      const fy = Math.floor(y);
+      g.set(fx + g.ox, fy + g.oy, '#5a1a10');
+      glow.set(fx + glow.ox, fy + glow.oy, s % 6 === 0 ? '#fff0c0' : '#ff8a2a');
+      if (s % 2 === 0) glow.set(fx + glow.ox + 1, fy + glow.oy, '#d8501a', 200);
+      a += rng.range(-0.55, 0.55);
       x += Math.cos(a);
       y += Math.sin(a);
-      if (rng.chance(0.08)) {
-        // ramificação curta
-        let bx = x;
-        let by = y;
-        let ba = a + rng.range(-1.2, 1.2);
-        for (let q = 0; q < 6; q++) {
-          bx += Math.cos(ba);
-          by += Math.sin(ba);
-          ba += rng.range(-0.4, 0.4);
-          if (Math.hypot(bx, by) > r - 3) break;
-          glow.set(Math.floor(bx) + glow.ox, Math.floor(by) + glow.oy, '#E8662E');
-        }
-      }
     }
   }
-  g.outline('#1A1222');
+  const crystal: [string, string, string, string] = ['#8a3410', '#e06a1e', '#ffb34b', '#fff0c0'];
+  const setG = (px: number, py: number, c: string) => glow.set(px + glow.ox, py + glow.oy, c);
+  for (let k = 0; k < 9; k++) {
+    const a = rng.next() * Math.PI * 2;
+    const dd = rng.range(r * 0.15, r * 0.8);
+    drawCrystal(setG, Math.round(Math.cos(a) * dd), Math.round(Math.sin(a) * dd) + 4, rng.int(4, 7), rng.int(2, 4), rng.range(-0.3, 0.3), crystal);
+  }
+  g.outline('#08040c');
   return { base: g.toSprite(), glow: glow.toSprite() };
 }
 
 // ---------------------------------------------------------------------------
-// Buraco negro
+// Buraco negro: disco de acreção em espiral (quadros pré-renderizados)
 // ---------------------------------------------------------------------------
 
 export interface BlackHoleArt {
+  frames: Sprite[];
   core: Sprite;
-  ring: Sprite;
-  halo: Sprite;
 }
+
+const DISK = ['#24104a', '#3c1672', '#5a1e98', '#8a2cba', '#c048d0', '#ea78cc', '#ffa08a', '#ffd27a', '#fff4d8'];
 
 export function makeBlackHole(absorb: number): BlackHoleArt {
-  const R = absorb + 2;
-  const core = new PixelGrid(R * 2 + 4, R * 2 + 4, R + 2, R + 2);
-  core.circle(0, 0, R, (x, y) => {
+  const core = absorb + 1.5;
+  const R = absorb + 42;
+  const N = 16;
+  const frames: Sprite[] = [];
+  for (let f = 0; f < N; f++) {
+    const phase = (f / N) * Math.PI * 2;
+    const g = new PixelGrid(R * 2 + 2, R * 2 + 2, R + 1, R + 1);
+    for (let y = -R; y <= R; y++) {
+      for (let x = -R; x <= R; x++) {
+        const px = x + 0.5;
+        const py = y + 0.5;
+        const d = Math.hypot(px, py);
+        if (d > R || d < core) continue;
+        const a = Math.atan2(py, px);
+        const u = (d - core) / (R - core); // 0 no centro → 1 na borda
+        const arms = 0.5 + 0.5 * Math.sin(2 * a - Math.log(d / core) * 5.2 + phase);
+        const fine = 0.5 + 0.5 * Math.sin(5 * a - Math.log(d / core) * 9 - phase * 2);
+        const fall = Math.pow(1 - u, 1.15);
+        let v = fall * (0.35 + Math.pow(arms, 2.2) * 0.75 + fine * 0.12) + (u < 0.1 ? (0.1 - u) * 6 : 0);
+        v += (bayer(x + 64, y + 64) - 0.5) * 0.16;
+        if (v < 0.14) continue;
+        g.set(x + g.ox, y + g.oy, DISK[Math.max(0, Math.min(DISK.length - 1, Math.floor(v * DISK.length * 0.9)))]);
+      }
+    }
+    frames.push(g.toSprite());
+  }
+  const cg = new PixelGrid(Math.ceil(core) * 2 + 4, Math.ceil(core) * 2 + 4, Math.ceil(core) + 2, Math.ceil(core) + 2);
+  cg.circle(0, 0, core + 0.8, (x, y) => {
     const d = Math.hypot(x, y);
-    return d > R - 1.2 ? '#FFE08A' : d > R - 2.4 ? '#9D68E8' : '#030208';
+    return d > core - 0.2 ? '#fff4d8' : d > core - 1.4 ? '#ffb34b' : '#000000';
   });
-  const r1 = R + 1;
-  const r2 = R + 10;
-  const ring = new PixelGrid(r2 * 2 + 2, r2 * 2 + 2, r2 + 1, r2 + 1);
-  for (let y = -r2; y <= r2; y++) {
-    for (let x = -r2; x <= r2; x++) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      const d = Math.hypot(px, py);
-      if (d < r1 || d > r2) continue;
-      const t = (d - r1) / (r2 - r1);
-      const a = Math.atan2(py, px);
-      const swirl = Math.sin(a * 3 + t * 6) * 0.5 + 0.5;
-      const v = (1 - t) * 0.9 + swirl * 0.25 - bayer(x, y) * 0.5;
-      if (v < 0.2) continue;
-      const col = v > 0.85 ? '#FFE08A' : v > 0.6 ? '#FF9A5A' : v > 0.4 ? '#C77AE8' : '#6A3AA8';
-      ring.set(x + ring.ox, y + ring.oy, col);
-    }
-  }
-  const hr = R + 22;
-  const halo = new PixelGrid(hr * 2 + 2, hr * 2 + 2, hr + 1, hr + 1);
-  for (let y = -hr; y <= hr; y++) {
-    for (let x = -hr; x <= hr; x++) {
-      const d = Math.hypot(x + 0.5, y + 0.5);
-      if (d < r2 - 2 || d > hr) continue;
-      const t = 1 - (d - (r2 - 2)) / (hr - r2 + 2);
-      if (bayer(x, y) < t * 0.55) halo.set(x + halo.ox, y + halo.oy, t > 0.6 ? '#5A3A9A' : '#3A2A6E');
-    }
-  }
-  return { core: core.toSprite(), ring: ring.toSprite(), halo: halo.toSprite() };
+  return { frames, core: cg.toSprite() };
 }
 
 // ---------------------------------------------------------------------------
-// Fragmentos
+// Fragmentos: minério facetado
 // ---------------------------------------------------------------------------
 
+const FRAG_RAMPS: Record<FragmentTypeId, [string, string, string, string, string]> = {
+  // contorno, sombra, corpo, luz, brilho
+  common: ['#3a1408', '#a8461a', '#f07e24', '#ffb84a', '#fff0c0'],
+  porous: ['#3a2618', '#8a6a48', '#c8a070', '#ecd0a0', '#fff6e0'],
+  dense: ['#1e0a08', '#5a2014', '#8a3a1e', '#c06030', '#ffb070'],
+  metallic: ['#10161e', '#3e5468', '#7890a8', '#b8cce0', '#ffffff'],
+  glass: ['#0a2a34', '#1f7a8a', '#3cc0d0', '#9cf4ff', '#ffffff'],
+  unstable: ['#2a0610', '#8a1a2a', '#e0304a', '#ff7a6a', '#ffe0a0'],
+  rare: ['#1a0a34', '#5a2aa8', '#9a5af0', '#d8b0ff', '#ffffff'],
+  shard: ['#0a2a34', '#1f7a8a', '#3cc0d0', '#9cf4ff', '#ffffff'],
+};
+
+export function fragmentGlowColor(type: FragmentTypeId): string {
+  return FRAG_RAMPS[type][2];
+}
+
 export function makeFragmentSprite(type: FragmentTypeId, local: Poly, radius: number, seed: number): Sprite {
-  const def = FRAGMENT_TYPES[type];
-  const [body, shadow, outline, shine] = def.colors;
+  const [outline, shadow, body, light, shine] = FRAG_RAMPS[type];
   const s = Math.ceil(radius) * 2 + 4;
   const g = new PixelGrid(s, s, s / 2, s / 2);
+  // centro das facetas deslocado para a luz
+  const c: Vec = { x: LIGHT.x * radius * 0.25, y: LIGHT.y * radius * 0.25 };
+  const n = local.length;
   g.poly(local, (x, y) => {
-    const l = (-x * 0.6 - y * 0.8) / radius;
-    const n = hash2(Math.floor(x * 2) + 50, Math.floor(y * 2) + 50, seed);
-    if (type === 'porous' && n > 0.82) return shadow;
-    if (type === 'dense' && n > 0.88) return outline;
-    if (l > 0.42) return shine;
-    if (l < -0.2) return shadow;
-    return body;
+    // faceta = setor do polígono a partir do centro deslocado
+    const a = Math.atan2(y - c.y, x - c.x);
+    let best = 0;
+    let bd = 1e9;
+    for (let i = 0; i < n; i++) {
+      const p = local[i];
+      const q = local[(i + 1) % n];
+      const mx = (p.x + q.x) / 2 - c.x;
+      const my = (p.y + q.y) / 2 - c.y;
+      const da = Math.abs(((Math.atan2(my, mx) - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (da < bd) {
+        bd = da;
+        best = i;
+      }
+    }
+    const p = local[best];
+    const q = local[(best + 1) % n];
+    const ex = q.x - p.x;
+    const ey = q.y - p.y;
+    const l = Math.hypot(ex, ey) || 1;
+    // normal externa da aresta → luz da faceta
+    const nx = ey / l;
+    const ny = -ex / l;
+    const lit = nx * LIGHT.x + ny * LIGHT.y;
+    const center = Math.hypot(x - c.x, y - c.y) < radius * 0.32;
+    if (type === 'porous' && hash2(Math.floor(x * 2) + 40, Math.floor(y * 2) + 40, seed) > 0.8) return shadow;
+    if (type === 'dense' && hash2(Math.floor(x) + 40, Math.floor(y) + 40, seed) > 0.85) return light;
+    if (center) return lit > -0.2 ? light : body;
+    return lit > 0.45 ? light : lit > -0.25 ? body : shadow;
   });
-  g.innerEdge(outline);
-  if (type === 'metallic') g.line(-radius * 0.4, -radius * 0.1, radius * 0.1, -radius * 0.5, '#FFFFFF');
-  if (type === 'unstable') g.set(g.ox, g.oy, PAL.core);
-  if (type === 'rare') {
-    g.set(g.ox - 1, g.oy - 1, '#FFFFFF');
-    g.set(g.ox, g.oy, '#FFFFFF');
-  }
-  if (type === 'glass') g.set(g.ox - 1, g.oy - 2, '#FFFFFF');
+  g.outline(outline);
+  // brilho especular
+  g.set(Math.round(g.ox + c.x - 1), Math.round(g.oy + c.y - 1), shine);
+  if (radius > 5) g.set(Math.round(g.ox + c.x), Math.round(g.oy + c.y - 1), shine);
+  if (type === 'unstable') g.set(g.ox, g.oy + 1, '#fff6c0');
   return g.toSprite();
+}
+
+/** Sprite radial suave reaproveitado para brilhos. */
+export function makeGlowSprite(color: string, size = 32): HTMLCanvasElement {
+  const c = makeCanvas(size, size);
+  const ctx = c.getContext('2d')!;
+  const [r, g, b] = hexToRgb(color);
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
+  grad.addColorStop(0.35, `rgba(${r},${g},${b},0.45)`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return c;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,11 +507,11 @@ export function makeFragmentSprite(type: FragmentTypeId, local: Poly, radius: nu
 
 export interface DeviceArt {
   base: Sprite;
-  /** quadros alternativos para animação */
   frames?: Sprite[];
   moving?: Sprite;
-  /** sprite de "ativação" (luz) */
   lit?: Sprite;
+  /** pontos de luz locais (para o bloom) */
+  lights: { x: number; y: number; color: string; size: number }[];
 }
 
 function gridFor(polys: Poly[], pad = 3): PixelGrid {
@@ -310,32 +531,39 @@ function gridFor(polys: Poly[], pad = 3): PixelGrid {
   return new PixelGrid(Math.ceil(maxX) + ox + pad, Math.ceil(maxY) + oy + pad, ox, oy);
 }
 
-function steelShade(poly: Poly, light = PAL.steelLight, mid = PAL.steel, dark = PAL.steelDark) {
+function bounds(poly: Poly) {
   let minY = Infinity;
   let maxY = -Infinity;
+  let minX = Infinity;
+  let maxX = -Infinity;
   for (const q of poly) {
     minY = Math.min(minY, q.y);
     maxY = Math.max(maxY, q.y);
+    minX = Math.min(minX, q.x);
+    maxX = Math.max(maxX, q.x);
   }
-  return (_x: number, y: number) => {
-    const t = (y - minY) / Math.max(1, maxY - minY);
-    return t < 0.3 ? light : t > 0.75 ? dark : mid;
+  return { minX, maxX, minY, maxY };
+}
+
+/** Metal com volume: topo claro, base escura. */
+function metal(poly: Poly, cols = METAL) {
+  const b = bounds(poly);
+  return (x: number, y: number) => {
+    const t = (y - b.minY) / Math.max(1, b.maxY - b.minY);
+    const sx = (x - b.minX) / Math.max(1, b.maxX - b.minX);
+    if (t < 0.18) return cols[5];
+    if (t < 0.4) return cols[4];
+    if (t > 0.8) return cols[1];
+    return sx < 0.08 ? cols[4] : cols[3];
   };
 }
 
-function plate(polys: Poly[], extra?: (g: PixelGrid, f: number) => void, frames = 1): DeviceArt {
-  const out: Sprite[] = [];
-  for (let f = 0; f < frames; f++) {
-    const g = gridFor(polys);
-    for (const p of polys) g.poly(p, steelShade(p));
-    extra?.(g, f);
-    g.outline('#141A26');
-    out.push(g.toSprite());
-  }
-  return { base: out[0], frames: frames > 1 ? out : undefined };
+function finish(g: PixelGrid) {
+  g.outline('#06080e');
+  return g.toSprite();
 }
 
-const cache = new Map<string, DeviceArt>();
+const cache = new Map<DeviceType, DeviceArt>();
 
 export function deviceArt(type: DeviceType): DeviceArt {
   const hit = cache.get(type);
@@ -344,163 +572,168 @@ export function deviceArt(type: DeviceType): DeviceArt {
   const solids = def.solids({});
   let art: DeviceArt;
   switch (type) {
-    case 'plank':
-      art = plate(solids, (g) => {
-        for (let x = -28; x <= 28; x += 8) g.set(x + g.ox, g.oy, '#9FB8C8');
-        g.line(-31, -3, 31, -3, '#A8C4D6');
-      });
+    case 'plank': {
+      // viga treliçada
+      const g = gridFor(solids);
+      g.poly(solids[0], metal(solids[0]));
+      for (let x = -30; x < 30; x += 6) g.line(x, -1, x + 3, 2, METAL[2]);
+      for (let x = -28; x <= 28; x += 14) g.set(x + g.ox, g.oy, BRASS[4]);
+      art = { base: finish(g), lights: [] };
       break;
-    case 'ramp':
-      art = plate(solids, (g) => {
-        for (const s of solids) g.line(s[0].x, s[0].y, s[1].x, s[1].y, '#A8C4D6');
-      });
+    }
+    case 'ramp': {
+      const g = gridFor(solids);
+      for (const s of solids) g.poly(s, metal(s, BRASS));
+      for (const s of solids) g.line(s[0].x, s[0].y, s[1].x, s[1].y, BRASS[5]);
+      art = { base: finish(g), lights: [] };
       break;
-    case 'deflector':
-      art = plate(solids, (g) => {
-        g.line(-16, -2, 16, -2, '#C8E0F0');
-        g.circle(0, 0, 3.2, PAL.steelDark);
-        g.set(g.ox, g.oy, PAL.amber);
-      });
+    }
+    case 'deflector': {
+      const g = gridFor(solids, 4);
+      g.poly(solids[0], metal(solids[0]));
+      g.line(-16, -2, 16, -2, '#d8ecff');
+      g.circle(0, 0, 3.4, BRASS[2]);
+      g.circle(0, 0, 1.6, PAL.amber);
+      art = { base: finish(g), lights: [{ x: 0, y: 0, color: PAL.amber, size: 10 }] };
       break;
+    }
     case 'bumper': {
-      const frames: Sprite[] = [];
-      for (let f = 0; f < 2; f++) {
+      const mk = (lit: boolean) => {
         const g = gridFor(solids);
         g.circle(0, 0, 9, (x, y) => {
           const d = Math.hypot(x, y);
-          if (d > 7.6) return f ? '#BFF6FF' : PAL.cyan;
-          if (d > 5.5) return (-x - y) > 2 ? PAL.steelLight : PAL.steel;
-          return f ? PAL.core : PAL.amber;
+          const l = (x * LIGHT.x + y * LIGHT.y) / 9;
+          if (d > 7.4) return lit ? '#e8ffff' : l > 0.2 ? '#9ff0fa' : PAL.cyan;
+          if (d > 5) return l > 0.1 ? METAL[4] : METAL[2];
+          return lit ? '#fff4c8' : l > 0 ? PAL.core : PAL.amber;
         });
-        g.outline('#141A26');
-        frames.push(g.toSprite());
-      }
-      art = { base: frames[0], lit: frames[1] };
+        return finish(g);
+      };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.cyan, size: 22 }] };
       break;
     }
     case 'booster': {
-      const mk = (lit: boolean) =>
-        plate(solids, (g) => {
-          for (let x = -14; x <= 10; x += 8) {
-            const c = lit ? '#E8FFFF' : PAL.cyan;
-            g.line(x, -2, x + 3, 0, c);
-            g.line(x + 3, 0, x, 2, c);
-          }
-        }).base;
-      art = { base: mk(false), lit: mk(true) };
+      const mk = (lit: boolean) => {
+        const g = gridFor(solids);
+        g.poly(solids[0], metal(solids[0]));
+        for (let x = -14; x <= 10; x += 8) {
+          const c = lit ? '#ffffff' : PAL.cyan;
+          g.line(x, -2, x + 3, 0, c);
+          g.line(x + 3, 0, x, 2, c);
+        }
+        return finish(g);
+      };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.cyan, size: 16 }] };
       break;
     }
     case 'launcher': {
-      const mk = (lit: boolean) =>
-        plate(solids, (g) => {
-          g.line(-15, 7, 15, 7, lit ? PAL.core : PAL.cyan);
-          g.set(g.ox - 14, g.oy - 9, PAL.amber);
-          g.set(g.ox + 13, g.oy - 9, PAL.amber);
-          g.line(0, 3, 0, 5, lit ? PAL.core : PAL.amber);
-        }).base;
-      art = { base: mk(false), lit: mk(true) };
+      const mk = (lit: boolean) => {
+        const g = gridFor(solids);
+        for (const s of solids) g.poly(s, metal(s, BRASS));
+        g.line(-14, 7, 14, 7, lit ? '#ffffff' : PAL.cyan);
+        g.line(-14, 8, 14, 8, lit ? PAL.core : '#1f9ab0');
+        g.set(g.ox - 14, g.oy - 4, PAL.core);
+        g.set(g.ox + 13, g.oy - 8, PAL.core);
+        return finish(g);
+      };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 6, color: PAL.cyan, size: 18 }, { x: 13, y: -8, color: PAL.amber, size: 8 }] };
       break;
     }
     case 'fan': {
       const frames: Sprite[] = [];
       for (let f = 0; f < 3; f++) {
         const g = gridFor([...solids, [{ x: 7, y: -11 }, { x: 11, y: -11 }, { x: 11, y: 11 }, { x: 7, y: 11 }]]);
-        for (const p of solids) g.poly(p, steelShade(p));
-        g.rect(-3, -8, 6, 16, PAL.steelDark);
+        for (const p of solids) g.poly(p, metal(p));
+        g.rect(-3, -8, 6, 16, METAL[1]);
         for (let k = 0; k < 4; k++) {
           const yy = -9 + ((k * 5 + f * 2) % 18);
-          g.rect(7, yy, 3, 2, '#BFE8F2');
+          g.rect(7, yy, 3, 2, '#d8f6ff');
         }
         g.rect(-5, -10, 1, 20, PAL.cyan);
-        g.outline('#141A26');
-        frames.push(g.toSprite());
+        frames.push(finish(g));
       }
-      art = { base: frames[0], frames };
+      art = { base: frames[0], frames, lights: [{ x: 8, y: 0, color: PAL.cyan, size: 18 }] };
       break;
     }
     case 'gate': {
       const posts = solids.slice(0, 2);
       const g = gridFor(posts);
-      for (const p of posts) g.poly(p, steelShade(p));
-      g.set(g.ox - 28, g.oy - 3, PAL.amber);
-      g.set(g.ox + 28, g.oy - 3, PAL.amber);
-      g.outline('#141A26');
-      // barra móvel desenhada com origem no pivô
+      for (const p of posts) g.poly(p, metal(p));
+      g.set(g.ox - 28, g.oy - 3, PAL.core);
+      g.set(g.ox + 28, g.oy - 3, PAL.core);
       const bar = solids[2].map((q) => ({ x: q.x + 25, y: q.y }));
       const gb = gridFor([bar], 2);
-      gb.poly(bar, (x) => (Math.floor((x + 50) / 5) % 2 ? '#FFB34B' : '#2A2230'));
-      gb.outline('#141A26');
-      art = { base: g.toSprite(), moving: gb.toSprite() };
+      gb.poly(bar, (x, y) => (Math.floor((x + 50) / 5) % 2 ? (y < 0 ? '#ffd27a' : PAL.amber) : '#1a1222'));
+      art = { base: finish(g), moving: finish(gb), lights: [{ x: -28, y: -3, color: PAL.amber, size: 8 }, { x: 28, y: -3, color: PAL.amber, size: 8 }] };
       break;
     }
     case 'conveyor': {
       const frames: Sprite[] = [];
       for (let f = 0; f < 4; f++) {
         const g = gridFor(solids);
-        g.poly(solids[0], (x, y) => (y < -2 ? '#3A4250' : y > 2 ? '#1E2430' : '#2A3140'));
-        for (let x = -40 + f * 2; x < 42; x += 8) g.line(x, -3, x, -3, '#9FB8C8');
-        for (let x = -36; x <= 36; x += 12) g.circle(x, 1, 2, PAL.steelLight);
-        g.outline('#141A26');
-        frames.push(g.toSprite());
+        g.poly(solids[0], (_x, y) => (y < -2.5 ? '#3a4458' : y > 2 ? '#141a26' : '#222a3a'));
+        for (let x = -40 + f * 2; x < 42; x += 8) g.line(x, -3, x + 1, -3, PAL.cyan);
+        for (let x = -36; x <= 36; x += 12) g.circle(x, 1, 2, BRASS[3]);
+        frames.push(finish(g));
       }
-      art = { base: frames[0], frames };
+      art = { base: frames[0], frames, lights: [{ x: 0, y: -3, color: PAL.cyan, size: 24 }] };
       break;
     }
     case 'damper': {
       const g = gridFor(solids);
-      g.poly(solids[0], (_x, y) => (y < 0 ? '#8A7AC8' : y < 2 ? PAL.lilac : PAL.steelDark));
-      g.line(-17, -3, 17, -3, '#B8A8F0');
-      g.outline('#141A26');
-      art = { base: g.toSprite() };
+      g.poly(solids[0], (_x, y) => (y < -2 ? '#c8b8ff' : y < 0 ? '#8a7ac8' : y < 2 ? PAL.lilac : METAL[1]));
+      art = { base: finish(g), lights: [] };
       break;
     }
     case 'attractor':
     case 'repulsor': {
-      const core = type === 'attractor' ? PAL.cyan : '#FF7A9A';
+      const core = type === 'attractor' ? PAL.cyan : '#ff7a9a';
       const mk = (lit: boolean) => {
         const g = gridFor(solids);
         g.circle(0, 0, 8, (x, y) => {
           const d = Math.hypot(x, y);
-          if (d > 6.2) return (-x - y) > 3 ? PAL.steelLight : PAL.steel;
-          if (d > 3.4) return PAL.steelDark;
-          return lit ? '#FFFFFF' : core;
+          const l = (x * LIGHT.x + y * LIGHT.y) / 8;
+          if (d > 6.2) return l > 0.2 ? BRASS[5] : BRASS[3];
+          if (d > 3.6) return METAL[1];
+          return lit ? '#ffffff' : d < 1.5 ? '#ffffff' : core;
         });
-        g.outline('#141A26');
-        return g.toSprite();
+        return finish(g);
       };
-      art = { base: mk(false), lit: mk(true) };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: core, size: 26 }] };
       break;
     }
     case 'arm': {
       const g = gridFor([solids[0]]);
-      g.poly(solids[0], steelShade(solids[0]));
-      g.set(g.ox, g.oy, PAL.amber);
-      g.outline('#141A26');
+      g.poly(solids[0], metal(solids[0], BRASS));
+      g.set(g.ox, g.oy, PAL.core);
       const armPoly = solids[1];
       const ga = gridFor([armPoly], 2);
-      ga.poly(armPoly, steelShade(armPoly));
-      ga.line(6, -3, ARM_LENGTH - 2, -3, '#A8C4D6');
+      ga.poly(armPoly, metal(armPoly));
+      ga.line(6, -3, ARM_LENGTH - 2, -3, '#d8ecff');
       ga.rect(ARM_LENGTH - 6, -2, 3, 3, PAL.amber);
-      ga.outline('#141A26');
-      art = { base: g.toSprite(), moving: ga.toSprite() };
+      art = { base: finish(g), moving: finish(ga), lights: [{ x: 0, y: 0, color: PAL.amber, size: 10 }] };
       break;
     }
     case 'lift': {
-      const mk = (lit: boolean) =>
-        plate(solids, (g) => {
-          for (let x = -14; x <= 12; x += 6) g.rect(x, -4, 3, 1, lit ? '#E8FFFF' : PAL.cyan);
-        }).base;
-      art = { base: mk(false), lit: mk(true) };
+      const mk = (lit: boolean) => {
+        const g = gridFor(solids);
+        g.poly(solids[0], metal(solids[0], BRASS));
+        for (let x = -14; x <= 12; x += 6) g.rect(x, -4, 3, 1, lit ? '#ffffff' : PAL.cyan);
+        return finish(g);
+      };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: -6, color: PAL.cyan, size: 30 }] };
       break;
     }
     case 'autoextractor': {
-      const mk = (lit: boolean) =>
-        plate(solids, (g) => {
-          g.rect(-6, -6, 12, 12, PAL.steelDark);
-          g.rect(-3, -3, 6, 6, lit ? PAL.core : PAL.amber);
-          g.line(-9, -9, -6, -6, PAL.cyan);
-        }).base;
-      art = { base: mk(false), lit: mk(true) };
+      const mk = (lit: boolean) => {
+        const g = gridFor(solids);
+        g.poly(solids[0], metal(solids[0], BRASS));
+        g.rect(-6, -6, 12, 12, METAL[1]);
+        g.rect(-3, -3, 6, 6, lit ? '#fff4c8' : PAL.amber);
+        g.line(-9, -9, -6, -6, PAL.cyan);
+        return finish(g);
+      };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.amber, size: 16 }] };
       break;
     }
     case 'sensor': {
@@ -517,7 +750,7 @@ export function deviceArt(type: DeviceType): DeviceArt {
         g.circle(0, 0, 2.5, c);
         return g.toSprite();
       };
-      art = { base: mk(false), lit: mk(true) };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 0, color: PAL.cyan, size: 12 }] };
       break;
     }
   }
@@ -526,43 +759,52 @@ export function deviceArt(type: DeviceType): DeviceArt {
 }
 
 /** Ícone de loja: o próprio sprite, ampliado com nearest-neighbor. */
-export function deviceIcon(type: DeviceType, size = 40): HTMLCanvasElement {
+export function deviceIcon(type: DeviceType, size = 48): HTMLCanvasElement {
   const art = deviceArt(type);
   const c = makeCanvas(size, size);
   const ctx = c.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  const parts: Sprite[] = [art.base];
-  if (art.moving) parts.push(art.moving);
   const s = art.base.canvas;
-  const span = Math.max(s.width, s.height, art.moving ? art.moving.canvas.width : 0);
-  const scale = Math.max(1, Math.floor((size - 4) / span)) || 1;
-  const k = Math.min(scale, (size - 4) / span);
+  const span = Math.max(s.width, s.height, art.moving ? art.moving.canvas.width + 20 : 0);
+  const k = Math.max(1, Math.floor((size - 6) / span)) || 1;
+  const fit = Math.min(k, (size - 6) / span);
   ctx.translate(size / 2, size / 2);
-  ctx.scale(k, k);
-  if (type === 'gate' || type === 'arm') {
-    const m = art.moving!;
+  ctx.scale(fit, fit);
+  if (type === 'lift') {
+    ctx.fillStyle = 'rgba(85,215,232,0.35)';
+    ctx.fillRect(-7, -22, 14, 18);
+  }
+  if (art.moving) {
+    const m = art.moving;
     const pivot = DEVICES[type].pivot!;
     ctx.drawImage(m.canvas, pivot.x - m.ox, pivot.y - m.oy);
   }
-  if (type === 'sensor') ctx.drawImage(s, -art.base.ox, -art.base.oy);
-  else ctx.drawImage(s, -art.base.ox, -art.base.oy);
-  if (type === 'lift') {
-    ctx.fillStyle = 'rgba(85,215,232,0.35)';
-    ctx.fillRect(-7, -16, 14, 12);
-  }
+  ctx.drawImage(s, -art.base.ox, -art.base.oy);
   return c;
 }
 
 // ---------------------------------------------------------------------------
-// Fundo
+// Fundo: céu em degradê, nebulosa, galáxia, planetas e rochas distantes
 // ---------------------------------------------------------------------------
+
+export interface FarRock {
+  sprite: Sprite;
+  x: number;
+  y: number;
+  par: number;
+}
 
 export interface BackgroundArt {
   far: HTMLCanvasElement;
   near: HTMLCanvasElement;
+  twinkles: { x: number; y: number; c: string; p: number }[];
   nebula: HTMLCanvasElement;
   nebulaScale: number;
+  galaxy: Sprite;
+  galaxyPos: Vec;
   planets: { sprite: Sprite; x: number; y: number; par: number }[];
+  farRocks: FarRock[];
+  frameRocks: FarRock[];
 }
 
 function starTile(size: number, density: number, colors: string[], seed: number, big: boolean) {
@@ -573,78 +815,182 @@ function starTile(size: number, density: number, colors: string[], seed: number,
     const x = rng.int(0, size - 1);
     const y = rng.int(0, size - 1);
     const c = rng.pick(colors);
-    const dim = rng.chance(0.6);
-    g.set(x, y, dim ? mix(c, '#0B1026', 0.55) : c);
-    if (big && rng.chance(0.08)) {
-      g.set(x + 1, y, mix(c, '#0B1026', 0.5));
-      g.set(x - 1, y, mix(c, '#0B1026', 0.5));
-      g.set(x, y + 1, mix(c, '#0B1026', 0.5));
-      g.set(x, y - 1, mix(c, '#0B1026', 0.5));
+    const dim = rng.chance(0.65);
+    g.set(x, y, c, dim ? 90 : 230);
+    if (big && rng.chance(0.07)) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.set(x + dx, y + dy, c, 110);
     }
   }
   return g.toSprite().canvas;
 }
 
-function planet(r: number, colors: [string, string], ring: boolean, seed: number): Sprite {
-  const pad = ring ? Math.ceil(r * 0.9) : 2;
+function planet(r: number, cols: [string, string, string], ring: boolean, seed: number): Sprite {
+  const pad = ring ? Math.ceil(r * 1.0) : 2;
   const g = new PixelGrid(r * 2 + pad * 2, r * 2 + pad * 2, r + pad, r + pad);
-  g.circle(0, 0, r, (x, y) => {
-    const l = (-x * 0.7 - y * 0.5) / r;
-    const band = valueNoise(0, y / 3 + 10, seed) > 0.55;
-    const t = l + (bayer(Math.floor(x + 50), Math.floor(y + 50)) - 0.5) * 0.4;
-    if (t < -0.35) return mix(colors[1], '#0B1026', 0.5);
-    if (t < 0.05) return band ? mix(colors[1], colors[0], 0.3) : colors[1];
-    return band ? mix(colors[0], '#FFFFFF', 0.15) : colors[0];
-  });
+  const ringPts: { x: number; y: number; front: boolean }[] = [];
   if (ring) {
-    for (let a = 0; a < Math.PI * 2; a += 0.01) {
-      const x = Math.cos(a) * r * 1.7;
-      const y = Math.sin(a) * r * 0.42;
-      const front = Math.sin(a) > 0;
-      if (!front && Math.hypot(x, y) < r) continue;
-      g.set(Math.floor(x + g.ox), Math.floor(y + g.oy - x * 0.12), mix(colors[0], '#FFFFFF', 0.3));
+    for (let a = 0; a < Math.PI * 2; a += 0.004) {
+      for (const rr of [1.55, 1.65, 1.78]) {
+        const x = Math.cos(a) * r * rr;
+        const y = Math.sin(a) * r * 0.36 * rr;
+        ringPts.push({ x: x, y: y - x * 0.18, front: Math.sin(a) > 0 });
+      }
     }
+    for (const p of ringPts) if (!p.front) g.set(Math.floor(p.x + g.ox), Math.floor(p.y + g.oy), mix(cols[0], '#ffffff', 0.2), 160);
   }
+  g.circle(0, 0, r, (x, y) => {
+    const nz = Math.sqrt(Math.max(0, 1 - (x * x + y * y) / (r * r)));
+    const l = (x / r) * -0.7 + (y / r) * -0.45 + nz * 0.55;
+    const band = valueNoise(0.5, y / (r * 0.18) + 10, seed) * 0.5 + valueNoise(x / r, y / (r * 0.3), seed + 2) * 0.2;
+    const t = l * 0.75 + band * 0.4 + (bayer(Math.floor(x + 64), Math.floor(y + 64)) - 0.5) * 0.2;
+    if (t < 0.12) return mix(cols[2], '#000000', 0.35);
+    if (t < 0.35) return cols[2];
+    if (t < 0.62) return cols[1];
+    return t > 0.88 ? mix(cols[0], '#ffffff', 0.35) : cols[0];
+  });
+  for (const p of ringPts) if (p.front) g.set(Math.floor(p.x + g.ox), Math.floor(p.y + g.oy), mix(cols[0], '#ffffff', 0.35), 220);
+  return g.toSprite();
+}
+
+function galaxy(t: Theme, seed: number): Sprite {
+  const w = 64;
+  const h = 34;
+  const g = new PixelGrid(w, h, w / 2, h / 2);
+  const rng = new Rng(seed);
+  for (let i = 0; i < 1400; i++) {
+    const arm = i % 2;
+    const r = Math.pow(rng.next(), 0.7) * 28;
+    const a = r * 0.22 + arm * Math.PI + rng.range(-0.35, 0.35);
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r * 0.45;
+    const c = r < 5 ? t.galaxy[0] : r < 14 ? t.galaxy[1] : t.galaxy[2];
+    g.set(Math.floor(x + g.ox), Math.floor(y + g.oy), c, r < 5 ? 255 : 160);
+  }
+  g.circle(0, 0, 2.2, '#ffffff');
+  return g.toSprite();
+}
+
+function rockBlob(size: number, cols: [string, string], rim: string, seed: number): Sprite {
+  const r = size / 2;
+  const g = new PixelGrid(size + 4, size + 4, r + 2, r + 2);
+  const dark = mix(cols[0], '#000000', 0.35);
+  const mid = mix(cols[0], cols[1], 0.5);
+  g.circle(0, 0, r, (x, y) => {
+    const a = Math.atan2(y, x);
+    const rr = r * (0.74 + 0.26 * fbm(Math.cos(a) * 1.5 + 3, Math.sin(a) * 1.5 + 3, seed, 3));
+    const d = Math.hypot(x, y);
+    if (d > rr) return null;
+    const nz = Math.sqrt(Math.max(0, 1 - (d / rr) ** 2));
+    const l = (x / rr) * -0.6 + (y / rr) * -0.8 + nz * 0.5;
+    if (d > rr - Math.max(1.2, r * 0.06) && l > 0.1) return rim;
+    const n = fbm(x / Math.max(3, r * 0.25) + 10, y / Math.max(3, r * 0.25), seed + 1, 3);
+    const t = l * 0.6 + n * 0.6 + (bayer(Math.floor(x + 64), Math.floor(y + 64)) - 0.5) * 0.15;
+    return t > 0.75 ? cols[1] : t > 0.5 ? mid : t > 0.25 ? cols[0] : dark;
+  });
   return g.toSprite();
 }
 
 export function makeBackground(zone: ZoneData): BackgroundArt {
-  const t: Theme = THEMES[zone.theme];
+  const t = THEMES[zone.theme];
   const seed = zone.id * 977;
-  const far = starTile(256, 0.0045, t.stars, seed + 1, false);
-  const near = starTile(320, 0.0016, t.stars, seed + 2, true);
-  const scaleN = 4;
-  const nw = Math.ceil(zone.width / scaleN) + 40;
-  const nh = Math.ceil(zone.height / scaleN) + 30;
+  const far = starTile(256, 0.006, t.stars, seed + 1, false);
+  const near = starTile(320, 0.0018, t.stars, seed + 2, true);
+  const rngT = new Rng(seed + 9);
+  const twinkles = Array.from({ length: 40 }, () => ({ x: rngT.next(), y: rngT.next(), c: rngT.pick(t.stars), p: rngT.next() * 6.28 }));
+
+  // nebulosa com distorção de domínio (fiapos)
+  const scaleN = 2;
+  const nw = Math.ceil((zone.width + 600) / scaleN);
+  const nh = Math.ceil((zone.height + 400) / scaleN);
   const g = new PixelGrid(nw, nh);
   const neb = t.nebula;
+  const cx = nw * (0.35 + new Rng(seed).next() * 0.3);
+  const cy = nh * 0.45;
   for (let y = 0; y < nh; y++) {
     for (let x = 0; x < nw; x++) {
-      const n = valueNoise(x / 22, y / 16, seed) * 0.6 + valueNoise(x / 9, y / 9, seed + 9) * 0.4;
-      const v = n - 0.45 + (bayer(x, y) - 0.5) * 0.12;
-      if (v < 0) continue;
-      const c = v > 0.22 ? neb[2] : v > 0.1 ? neb[1] : neb[0];
-      g.set(x, y, c, v > 0.1 ? 120 : 80);
+      const wx = x / 70;
+      const wy = y / 55;
+      const qx = fbm(wx, wy, seed, 3);
+      const qy = fbm(wx + 5.2, wy + 1.3, seed + 4, 3);
+      let v = fbm(wx + qx * 1.8, wy + qy * 1.8, seed + 8, 4);
+      // concentra a nebulosa numa faixa diagonal
+      const band = 1 - Math.min(1, Math.abs((y - cy) / nh - (x - cx) / nw * 0.6) * 2.2);
+      v = v * (0.5 + band * 0.7) - 0.42 + (bayer(x, y) - 0.5) * 0.07;
+      if (v <= 0) continue;
+      const k = Math.min(neb.length - 1, Math.floor(v * neb.length * 1.7));
+      g.set(x, y, neb[k], Math.min(150, 45 + v * 300));
     }
   }
   const rng = new Rng(seed + 5);
   const planets: BackgroundArt['planets'] = [];
-  planets.push({
-    sprite: planet(rng.int(9, 14), t.planet, rng.chance(0.6), seed),
-    x: rng.range(0.55, 0.85) * zone.width,
-    y: rng.range(0.08, 0.25) * zone.height,
-    par: 0.12,
+  planets.push({ sprite: planet(rng.int(16, 24), t.planet, true, seed), x: rng.range(0.62, 0.88) * zone.width, y: rng.range(0.06, 0.2) * zone.height, par: 0.1 });
+  planets.push({ sprite: planet(rng.int(5, 8), [t.nebula[4], t.nebula[2], t.nebula[0]], false, seed + 3), x: rng.range(0.12, 0.4) * zone.width, y: rng.range(0.05, 0.16) * zone.height, par: 0.05 });
+  const farRocks: FarRock[] = [];
+  for (let i = 0; i < 12; i++) {
+    const size = rng.int(6, 26);
+    farRocks.push({ sprite: rockBlob(size, t.farRock, mix(t.farRock[1], t.rim, 0.35), seed + 40 + i), x: rng.range(-0.1, 1.1) * zone.width, y: rng.range(0.05, 0.95) * zone.height, par: 0.25 + size / 120 });
+  }
+  // rochas grandes em primeiro plano, fora dos limites do mapa (moldura)
+  const frameRocks: FarRock[] = [];
+  const darks: [string, string] = [mix(t.farRock[0], '#000000', 0.35), mix(t.farRock[1], t.rock[2], 0.4)];
+  const spots = [
+    [-60, zone.height + 20],
+    [zone.width * 0.3, zone.height + 70],
+    [zone.width + 60, zone.height - 40],
+    [zone.width + 70, 60],
+    [-70, 40],
+    [zone.width * 0.75, zone.height + 80],
+  ];
+  spots.forEach(([x, y], i) => {
+    const size = rng.int(70, 140);
+    frameRocks.push({ sprite: rockBlob(size, darks, mix(t.rock[3], t.rim, 0.45), seed + 90 + i), x, y, par: 1.12 });
   });
-  if (rng.chance(0.6))
-    planets.push({
-      sprite: planet(rng.int(4, 6), [t.nebula[1], t.nebula[0]], false, seed + 3),
-      x: rng.range(0.15, 0.45) * zone.width,
-      y: rng.range(0.05, 0.18) * zone.height,
-      par: 0.06,
-    });
-  return { far, near, nebula: g.toSprite().canvas, nebulaScale: scaleN, planets };
+  return {
+    far,
+    near,
+    twinkles,
+    nebula: g.toSprite().canvas,
+    nebulaScale: scaleN,
+    galaxy: galaxy(t, seed + 7),
+    galaxyPos: { x: rng.range(0.4, 0.95) * zone.width, y: rng.range(0.04, 0.3) * zone.height },
+    planets,
+    farRocks,
+    frameRocks,
+  };
 }
 
-export function rotatePoint(x: number, y: number, a: number) {
-  return rot({ x, y }, a);
+/** Degradê vertical do céu com pontilhado ordenado. */
+export function makeSky(theme: Theme, w: number, h: number): HTMLCanvasElement {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(w, h);
+  const steps = 8;
+  const cols = Array.from({ length: steps }, (_, q) => hexToRgb(ramp([theme.skyTop, mix(theme.skyTop, theme.skyBottom, 0.55), theme.skyBottom], q / (steps - 1))));
+  const d = img.data;
+  for (let y = 0; y < h; y++) {
+    const t = y / Math.max(1, h - 1);
+    for (let x = 0; x < w; x++) {
+      const q = Math.max(0, Math.min(steps - 1, Math.floor(t * steps + (bayer(x >> 1, y >> 1) - 0.5) * 0.9)));
+      const c3 = cols[q];
+      const o = (y * w + x) * 4;
+      d[o] = c3[0];
+      d[o + 1] = c3[1];
+      d[o + 2] = c3[2];
+      d[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Vinheta escura nas bordas. */
+export function makeVignette(w: number, h: number): HTMLCanvasElement {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.75);
+  g.addColorStop(0, 'rgba(4,2,12,0)');
+  g.addColorStop(1, 'rgba(4,2,12,0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  return c;
 }

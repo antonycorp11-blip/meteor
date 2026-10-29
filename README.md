@@ -4,6 +4,16 @@ Quebre um asteroide gigante, solte fragmentos com física própria e invente cam
 
 Jogo 2D de física/engenharia em pixel art procedural, com trilha original gerada por Web Audio. Implementado a partir da *Bíblia de Design / Prompt Mestre v1.0*.
 
+![Zona 1](docs/screens/zona1.png)
+
+## Visual
+
+- Arte 100% procedural em pixel art: ilhas de rocha com silhueta orgânica (blocos, borda iluminada, poeira no topo, gotejamentos pendentes e cristais luminosos), asteroide com fissuras e minério que pulsam, disco de acreção em espiral animado, fragmentos como minério facetado.
+- Céu em degradê pontilhado, nebulosa com fiapos, galáxia, planetas com anéis, rochas distantes em paralaxe e rochas de moldura em primeiro plano (fora do mapa).
+- Camada de luz aditiva (bloom discreto) sem borrar contornos; vinheta.
+- Escala de pixel adaptativa: o mapa inteiro aparece perto de 1:1, sem reamostrar a arte para baixo.
+- Interface em vidro violeta com fonte Pixelify Sans nos títulos e Inter nos números e textos (ambas OFL, empacotadas — funcionam offline). Capturas em `docs/screens/`.
+
 ## Rodar
 
 ```bash

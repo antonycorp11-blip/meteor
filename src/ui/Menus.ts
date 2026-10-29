@@ -3,8 +3,6 @@ import { Config } from '../core/Config';
 import { FRAGMENT_TYPES } from '../physics/fragmentTypes';
 import { BRANCHES, RESEARCH, canBuy } from '../progression/Research';
 import type { GoalProgress } from '../progression/Goals';
-import { pixelTitle } from '../render/PixelFont';
-import { PAL } from '../render/palette';
 import type { Settings } from '../save/SaveManager';
 import { clear, fmt, h, icon } from './dom';
 import type { GameApi } from './GameApi';
@@ -33,11 +31,13 @@ export class Menus {
   close() {
     this.screen = null;
     this.root.classList.remove('show');
+    document.body.classList.remove('on-title');
     this.onClose();
   }
 
   private open(s: Screen, ...content: (Node | null)[]) {
     this.screen = s;
+    document.body.classList.toggle('on-title', s === 'title');
     clear(this.card);
     this.card.className = `menu-card panel screen-${s}`;
     for (const c of content) if (c) this.card.append(c);
@@ -89,8 +89,10 @@ export class Menus {
     const logo = h(
       'div',
       { class: 'logo' },
-      pixelTitle('METEOR', 7, '#F4F1FF', '#272044'),
-      pixelTitle('MILL', 7, PAL.amber, '#5A2A14'),
+      h('div', { class: 'logo-kicker' }, 'ATHG · CONCEITO ORIGINAL'),
+      h('div', { class: 'logo-meteor' }, 'METEOR'),
+      h('div', { class: 'logo-mill' }, 'MILL'),
+      h('div', { class: 'logo-sub' }, 'FÍSICA LIVRE · ENGENHARIA · ESPAÇO ACONCHEGANTE'),
     );
     const btn = (label: string, fn: () => void, primary = false) =>
       h('button', { class: `btn big ${primary ? 'primary' : ''}`, onclick: () => (this.api.uiSound(), fn()) }, label);
@@ -347,7 +349,7 @@ export class Menus {
     btns.push(h('button', { class: 'btn big', onclick: () => (this.api.uiSound(), this.close()) }, 'Continuar otimizando aqui'));
     this.open(
       'complete',
-      pixelTitle('ZONA CONCLUIDA', 4, PAL.core),
+      h('div', { class: 'complete-title' }, 'ZONA CONCLUÍDA'),
       h('p', { class: 'tagline' }, campaign ? `${zoneName} concluída — a campanha base está completa! O Sensor + acionador foi liberado e todas as zonas seguem abertas para otimização livre.` : `${zoneName} concluída. Sua instalação continua salva aqui.`),
       h('div', { class: 'menu-buttons' }, ...btns),
     );

@@ -1,5 +1,3 @@
-import { pixelTitle } from '../render/PixelFont';
-import { PAL } from '../render/palette';
 import { fmt, h, icon } from './dom';
 import type { GameApi, HudData } from './GameApi';
 
@@ -36,7 +34,7 @@ export class Hud {
     const left = h(
       'div',
       { class: 'hud-left panel' },
-      h('div', { class: 'credits' }, h('span', { class: 'gem' }, '◆'), this.credits, this.combo),
+      h('div', { class: 'credits' }, h('span', { class: 'gem' }), this.credits, this.combo),
       this.zoneName,
     );
 
@@ -130,7 +128,7 @@ export class Hud {
 
   /** Cartão curto de nova zona/conquista, sem cortar o jogo. */
   banner(title: string, sub: string) {
-    const el = h('div', { class: 'banner' }, pixelTitle(title, 3, PAL.core), h('div', { class: 'banner-sub' }, sub));
+    const el = h('div', { class: 'banner' }, h('div', { class: 'banner-title' }, title), h('div', { class: 'banner-sub' }, sub));
     this.root.append(el);
     setTimeout(() => el.classList.add('out'), 3200);
     setTimeout(() => el.remove(), 3800);
