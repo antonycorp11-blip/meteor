@@ -1,0 +1,324 @@
+{
+ "id": 1,
+ "key": "limiar",
+ "name": "Limiar de Cinzas",
+ "subtitle": "Desvio de um pared\u00e3o em ombro",
+ "theme": "ash",
+ "intro": "Quebre o asteroide. Alimente o buraco negro.",
+ "width": 960,
+ "height": 540,
+ "gravity": {
+  "x": 0,
+  "y": 1
+ },
+ "terrain": [
+  [
+   [
+    0,
+    150
+   ],
+   [
+    26,
+    150
+   ],
+   [
+    26,
+    330
+   ],
+   [
+    0,
+    330
+   ]
+  ],
+  [
+   [
+    0,
+    330
+   ],
+   [
+    150,
+    330
+   ],
+   [
+    150,
+    540
+   ],
+   [
+    0,
+    540
+   ]
+  ],
+  [
+   [
+    150,
+    330
+   ],
+   [
+    385,
+    400
+   ],
+   [
+    385,
+    540
+   ],
+   [
+    150,
+    540
+   ]
+  ],
+  [
+   [
+    385,
+    516
+   ],
+   [
+    595,
+    516
+   ],
+   [
+    595,
+    540
+   ],
+   [
+    385,
+    540
+   ]
+  ],
+  [
+   [
+    420,
+    96
+   ],
+   [
+    540,
+    96
+   ],
+   [
+    540,
+    368
+   ],
+   [
+    420,
+    368
+   ]
+  ],
+  [
+   [
+    540,
+    150
+   ],
+   [
+    585,
+    168
+   ],
+   [
+    585,
+    262
+   ],
+   [
+    540,
+    280
+   ]
+  ],
+  [
+   [
+    595,
+    448
+   ],
+   [
+    700,
+    460
+   ],
+   [
+    700,
+    540
+   ],
+   [
+    595,
+    540
+   ]
+  ],
+  [
+   [
+    700,
+    460
+   ],
+   [
+    860,
+    466
+   ],
+   [
+    860,
+    540
+   ],
+   [
+    700,
+    540
+   ]
+  ],
+  [
+   [
+    860,
+    360
+   ],
+   [
+    960,
+    360
+   ],
+   [
+    960,
+    540
+   ],
+   [
+    860,
+    540
+   ]
+  ]
+ ],
+ "asteroid": {
+  "x": 130,
+  "y": 236,
+  "r": 40
+ },
+ "blackHole": {
+  "x": 792,
+  "y": 428,
+  "attractRadius": 86,
+  "absorbRadius": 15,
+  "strength": 980
+ },
+ "noBuild": [],
+ "fields": [],
+ "regions": [],
+ "tools": [
+  "plank",
+  "ramp",
+  "deflector",
+  "bumper"
+ ],
+ "startCredits": 0,
+ "priceMult": 1,
+ "fragmentTable": [
+  {
+   "type": "common",
+   "weight": 1
+  }
+ ],
+ "efficiencyWindow": 30,
+ "goals": [
+  {
+   "id": "z1-basic",
+   "tier": "basic",
+   "title": "Alimente o buraco negro com 70 de massa",
+   "reqs": [
+    {
+     "kind": "mass",
+     "target": 70
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z1-eng",
+   "tier": "engineering",
+   "title": "Efici\u00eancia de 35% (janela de 30 fragmentos)",
+   "reqs": [
+    {
+     "kind": "efficiency",
+     "pct": 35
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z1-x1",
+   "tier": "extra",
+   "title": "Entregue 8 seguidos sem perder nenhum",
+   "reqs": [
+    {
+     "kind": "streak",
+     "count": 8
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z1-x2",
+   "tier": "extra",
+   "title": "10 entregas sem interven\u00e7\u00e3o manual",
+   "reqs": [
+    {
+     "kind": "autoDeliveries",
+     "count": 10
+    }
+   ],
+   "research": 2
+  }
+ ],
+ "hints": [
+  "Rampa n\u00e3o \u00e9 trilho: pequenos ajustes de \u00e2ngulo mudam a trajet\u00f3ria.",
+  "Tente mudar o \u00e2ngulo de sa\u00edda da primeira placa.",
+  "Um bumper devolve energia a quem perdeu velocidade."
+ ],
+ "solutions": [
+  {
+   "id": "A",
+   "label": "Canal de placas sobre o fosso at\u00e9 a encosta",
+   "devices": [
+    {
+     "type": "plank",
+     "x": 418.2,
+     "y": 411.9,
+     "angle": 0.217
+    },
+    {
+     "type": "plank",
+     "x": 482.7,
+     "y": 426.1,
+     "angle": 0.217
+    },
+    {
+     "type": "plank",
+     "x": 547.1,
+     "y": 440.3,
+     "angle": 0.217
+    }
+   ],
+   "expectRate": 0.35
+  },
+  {
+   "id": "B",
+   "label": "Arrasto manual pela abertura e otimiza\u00e7\u00e3o com impulso",
+   "manual": true,
+   "devices": []
+  },
+  {
+   "id": "C",
+   "label": "Rampa curva na borda, bumper devolvendo energia e placa receptora",
+   "devices": [
+    {
+     "type": "ramp",
+     "x": 445.1,
+     "y": 457.9,
+     "angle": -0.4
+    },
+    {
+     "type": "bumper",
+     "x": 424.9,
+     "y": 430,
+     "angle": 0,
+     "params": {
+      "power": 4.13
+     }
+    },
+    {
+     "type": "plank",
+     "x": 561.4,
+     "y": 420.1,
+     "angle": 0.146
+    }
+   ],
+   "expectRate": 0.5
+  }
+ ]
+}

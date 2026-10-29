@@ -1,0 +1,382 @@
+{
+ "id": 2,
+ "key": "orion",
+ "name": "Fenda de \u00d3rion",
+ "subtitle": "Abismo e c\u00e2mara elevada",
+ "theme": "orion",
+ "intro": "Um abismo e um pared\u00e3o. Eleve ou lance os fragmentos.",
+ "width": 1120,
+ "height": 640,
+ "gravity": {
+  "x": 0,
+  "y": 1
+ },
+ "terrain": [
+  [
+   [
+    0,
+    250
+   ],
+   [
+    24,
+    250
+   ],
+   [
+    24,
+    455
+   ],
+   [
+    0,
+    455
+   ]
+  ],
+  [
+   [
+    0,
+    455
+   ],
+   [
+    220,
+    455
+   ],
+   [
+    220,
+    640
+   ],
+   [
+    0,
+    640
+   ]
+  ],
+  [
+   [
+    220,
+    455
+   ],
+   [
+    400,
+    515
+   ],
+   [
+    400,
+    640
+   ],
+   [
+    220,
+    640
+   ]
+  ],
+  [
+   [
+    520,
+    0
+   ],
+   [
+    610,
+    0
+   ],
+   [
+    610,
+    200
+   ],
+   [
+    520,
+    200
+   ]
+  ],
+  [
+   [
+    545,
+    200
+   ],
+   [
+    585,
+    200
+   ],
+   [
+    585,
+    300
+   ],
+   [
+    545,
+    300
+   ]
+  ],
+  [
+   [
+    655,
+    585
+   ],
+   [
+    820,
+    585
+   ],
+   [
+    820,
+    640
+   ],
+   [
+    655,
+    640
+   ]
+  ],
+  [
+   [
+    820,
+    280
+   ],
+   [
+    860,
+    280
+   ],
+   [
+    860,
+    640
+   ],
+   [
+    820,
+    640
+   ]
+  ],
+  [
+   [
+    860,
+    430
+   ],
+   [
+    1120,
+    430
+   ],
+   [
+    1120,
+    640
+   ],
+   [
+    860,
+    640
+   ]
+  ],
+  [
+   [
+    1090,
+    200
+   ],
+   [
+    1120,
+    200
+   ],
+   [
+    1120,
+    430
+   ],
+   [
+    1090,
+    430
+   ]
+  ],
+  [
+   [
+    900,
+    0
+   ],
+   [
+    1120,
+    0
+   ],
+   [
+    1120,
+    200
+   ],
+   [
+    900,
+    200
+   ]
+  ]
+ ],
+ "asteroid": {
+  "x": 170,
+  "y": 400,
+  "r": 42
+ },
+ "blackHole": {
+  "x": 985,
+  "y": 388,
+  "attractRadius": 90,
+  "absorbRadius": 15,
+  "strength": 980
+ },
+ "noBuild": [],
+ "fields": [],
+ "regions": [],
+ "tools": [
+  "booster",
+  "launcher"
+ ],
+ "startCredits": 60,
+ "priceMult": 1.1,
+ "fragmentTable": [
+  {
+   "type": "common",
+   "weight": 0.8
+  },
+  {
+   "type": "porous",
+   "weight": 0.2
+  }
+ ],
+ "efficiencyWindow": 40,
+ "goals": [
+  {
+   "id": "z2-basic",
+   "tier": "basic",
+   "title": "Alimente o buraco negro com 160 de massa",
+   "reqs": [
+    {
+     "kind": "mass",
+     "target": 160
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z2-eng",
+   "tier": "engineering",
+   "title": "Efici\u00eancia de 40% (janela de 40 fragmentos)",
+   "reqs": [
+    {
+     "kind": "efficiency",
+     "pct": 40
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z2-x1",
+   "tier": "extra",
+   "title": "Entrega por lan\u00e7amento a 250 px ou mais",
+   "reqs": [
+    {
+     "kind": "launchDistance",
+     "dist": 250
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z2-x2",
+   "tier": "extra",
+   "title": "15 entregas seguidas sem tocar em nenhum fragmento",
+   "reqs": [
+    {
+     "kind": "handsFreeStreak",
+     "count": 15
+    }
+   ],
+   "research": 2
+  }
+ ],
+ "hints": [
+  "O lan\u00e7ador n\u00e3o trava o fragmento: ele s\u00f3 d\u00e1 o impulso.",
+  "Uma placa receptora depois do arco evita que o fragmento quique de volta.",
+  "Propulsores em sequ\u00eancia vencem um desn\u00edvel aos poucos."
+ ],
+ "solutions": [
+  {
+   "id": "A",
+   "label": "Catapulta na borda com anteparo e placa receptora na c\u00e2mara",
+   "aim": {
+    "x": 260,
+    "y": 340
+   },
+   "expectRate": 0.2,
+   "devices": [
+    {
+     "type": "launcher",
+     "x": 448.9,
+     "y": 554.4,
+     "angle": 0.453,
+     "params": {
+      "power": 12.1
+     }
+    },
+    {
+     "type": "plank",
+     "x": 510,
+     "y": 542.7,
+     "angle": 1.481
+    },
+    {
+     "type": "plank",
+     "x": 909.9,
+     "y": 367,
+     "angle": 0.016
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "label": "Ponte de placas, propulsor e lan\u00e7ador na plataforma com defletor sobre o pared\u00e3o",
+   "aim": {
+    "x": 260,
+    "y": 340
+   },
+   "expectRate": 0.08,
+   "devices": [
+    {
+     "type": "plank",
+     "x": 433.7,
+     "y": 524,
+     "angle": 0.126
+    },
+    {
+     "type": "plank",
+     "x": 499.2,
+     "y": 532.3,
+     "angle": 0.126
+    },
+    {
+     "type": "plank",
+     "x": 564.7,
+     "y": 540.6,
+     "angle": 0.126
+    },
+    {
+     "type": "booster",
+     "x": 628.7,
+     "y": 552.1,
+     "angle": -0.106,
+     "params": {
+      "power": 5.24
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 771.4,
+     "y": 571,
+     "angle": 0.093,
+     "params": {
+      "power": 12.29
+     }
+    },
+    {
+     "type": "deflector",
+     "x": 901.8,
+     "y": 236.2,
+     "angle": -0.747
+    },
+    {
+     "type": "plank",
+     "x": 891.3,
+     "y": 342.7,
+     "angle": 0.547
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "label": "Arrasto manual at\u00e9 a borda superior do pared\u00e3o e ricochete na c\u00e2mara",
+   "manual": true,
+   "devices": []
+  }
+ ]
+}

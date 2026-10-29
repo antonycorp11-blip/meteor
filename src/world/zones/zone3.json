@@ -1,0 +1,490 @@
+{
+ "id": 3,
+ "key": "basalto",
+ "name": "Labirinto de Basalto",
+ "subtitle": "Tr\u00eas desn\u00edveis e corredores em zigue-zague",
+ "theme": "basalt",
+ "intro": "Curvas, gargalos e po\u00e7os. Mantenha o fluxo vivo.",
+ "width": 1280,
+ "height": 720,
+ "gravity": {
+  "x": 0,
+  "y": 1
+ },
+ "terrain": [
+  [
+   [
+    0,
+    80
+   ],
+   [
+    24,
+    80
+   ],
+   [
+    24,
+    270
+   ],
+   [
+    0,
+    270
+   ]
+  ],
+  [
+   [
+    0,
+    270
+   ],
+   [
+    190,
+    270
+   ],
+   [
+    190,
+    720
+   ],
+   [
+    0,
+    720
+   ]
+  ],
+  [
+   [
+    190,
+    270
+   ],
+   [
+    330,
+    320
+   ],
+   [
+    330,
+    720
+   ],
+   [
+    190,
+    720
+   ]
+  ],
+  [
+   [
+    330,
+    560
+   ],
+   [
+    760,
+    560
+   ],
+   [
+    760,
+    720
+   ],
+   [
+    330,
+    720
+   ]
+  ],
+  [
+   [
+    400,
+    110
+   ],
+   [
+    470,
+    110
+   ],
+   [
+    470,
+    440
+   ],
+   [
+    400,
+    440
+   ]
+  ],
+  [
+   [
+    760,
+    0
+   ],
+   [
+    830,
+    0
+   ],
+   [
+    830,
+    520
+   ],
+   [
+    760,
+    520
+   ]
+  ],
+  [
+   [
+    760,
+    600
+   ],
+   [
+    860,
+    632
+   ],
+   [
+    860,
+    720
+   ],
+   [
+    760,
+    720
+   ]
+  ],
+  [
+   [
+    1000,
+    380
+   ],
+   [
+    1060,
+    380
+   ],
+   [
+    1060,
+    720
+   ],
+   [
+    1000,
+    720
+   ]
+  ],
+  [
+   [
+    1060,
+    650
+   ],
+   [
+    1280,
+    650
+   ],
+   [
+    1280,
+    720
+   ],
+   [
+    1060,
+    720
+   ]
+  ],
+  [
+   [
+    1240,
+    300
+   ],
+   [
+    1280,
+    300
+   ],
+   [
+    1280,
+    650
+   ],
+   [
+    1240,
+    650
+   ]
+  ],
+  [
+   [
+    1060,
+    0
+   ],
+   [
+    1280,
+    0
+   ],
+   [
+    1280,
+    150
+   ],
+   [
+    1060,
+    150
+   ]
+  ],
+  [
+   [
+    860,
+    695
+   ],
+   [
+    935,
+    695
+   ],
+   [
+    935,
+    720
+   ],
+   [
+    860,
+    720
+   ]
+  ],
+  [
+   [
+    935,
+    650
+   ],
+   [
+    1000,
+    650
+   ],
+   [
+    1000,
+    720
+   ],
+   [
+    935,
+    720
+   ]
+  ]
+ ],
+ "asteroid": {
+  "x": 150,
+  "y": 200,
+  "r": 40
+ },
+ "blackHole": {
+  "x": 1160,
+  "y": 600,
+  "attractRadius": 90,
+  "absorbRadius": 15,
+  "strength": 980
+ },
+ "noBuild": [],
+ "fields": [],
+ "regions": [],
+ "tools": [
+  "fan",
+  "gate",
+  "conveyor"
+ ],
+ "startCredits": 80,
+ "priceMult": 1.2,
+ "fragmentTable": [
+  {
+   "type": "common",
+   "weight": 0.65
+  },
+  {
+   "type": "porous",
+   "weight": 0.2
+  },
+  {
+   "type": "glass",
+   "weight": 0.15
+  }
+ ],
+ "efficiencyWindow": 50,
+ "goals": [
+  {
+   "id": "z3-basic",
+   "tier": "basic",
+   "title": "Alimente o buraco negro com 320 de massa",
+   "reqs": [
+    {
+     "kind": "mass",
+     "target": 320
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z3-eng",
+   "tier": "engineering",
+   "title": "55% de efici\u00eancia (janela de 50) e 25 entregas autom\u00e1ticas",
+   "reqs": [
+    {
+     "kind": "efficiency",
+     "pct": 55
+    },
+    {
+     "kind": "autoDeliveries",
+     "count": 25
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z3-x1",
+   "tier": "extra",
+   "title": "60 s de fluxo sem gargalo de 12+ detritos parados",
+   "reqs": [
+    {
+     "kind": "cleanFlow",
+     "seconds": 60,
+     "maxCluster": 12
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z3-x2",
+   "tier": "extra",
+   "title": "Combo de 10 entregas",
+   "reqs": [
+    {
+     "kind": "combo",
+     "count": 10
+    }
+   ],
+   "research": 2
+  }
+ ],
+ "hints": [
+  "Uma esteira aberta empurra, mas n\u00e3o prende: pedras podem saltar.",
+  "Uma portinhola alterna duas rotas e evita congestionamento.",
+  "Ventiladores perdem for\u00e7a em fragmentos densos."
+ ],
+ "solutions": [
+  {
+   "id": "A",
+   "label": "Percurso superior de placas sobre o po\u00e7o, queda at\u00e9 o bols\u00e3o e lan\u00e7ador sobre o pared\u00e3o em S",
+   "aim": {
+    "x": 230,
+    "y": 140
+   },
+   "pace": 80,
+   "expectRate": 0.4,
+   "devices": [
+    {
+     "type": "plank",
+     "x": 366.4,
+     "y": 475.9,
+     "angle": 0.186
+    },
+    {
+     "type": "plank",
+     "x": 431.3,
+     "y": 488.1,
+     "angle": 0.186
+    },
+    {
+     "type": "plank",
+     "x": 496.2,
+     "y": 500.3,
+     "angle": 0.186
+    },
+    {
+     "type": "plank",
+     "x": 561,
+     "y": 512.5,
+     "angle": 0.186
+    },
+    {
+     "type": "plank",
+     "x": 625.9,
+     "y": 524.8,
+     "angle": 0.186
+    },
+    {
+     "type": "plank",
+     "x": 690.8,
+     "y": 537,
+     "angle": 0.186
+    },
+    {
+     "type": "launcher",
+     "x": 903.3,
+     "y": 672.6,
+     "angle": 0.21,
+     "params": {
+      "power": 12.59
+     }
+    },
+    {
+     "type": "plank",
+     "x": 1125.5,
+     "y": 530.1,
+     "angle": 0.421
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "label": "Percurso inferior: esteiras abertas tiram os detritos do po\u00e7o at\u00e9 o lan\u00e7ador",
+   "aim": {
+    "x": 230,
+    "y": 140
+   },
+   "pace": 80,
+   "expectRate": 0.35,
+   "devices": [
+    {
+     "type": "conveyor",
+     "x": 385,
+     "y": 551,
+     "angle": 0,
+     "params": {
+      "speed": 4.07
+     }
+    },
+    {
+     "type": "conveyor",
+     "x": 472,
+     "y": 551,
+     "angle": 0,
+     "params": {
+      "speed": 4.73
+     }
+    },
+    {
+     "type": "conveyor",
+     "x": 559,
+     "y": 551,
+     "angle": 0,
+     "params": {
+      "speed": 3.14
+     }
+    },
+    {
+     "type": "conveyor",
+     "x": 646,
+     "y": 551,
+     "angle": 0,
+     "params": {
+      "speed": 4.3
+     }
+    },
+    {
+     "type": "conveyor",
+     "x": 735,
+     "y": 551,
+     "angle": 0,
+     "params": {
+      "speed": 3.37
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 907.4,
+     "y": 677.5,
+     "angle": 0.16,
+     "params": {
+      "power": 11.91
+     }
+    },
+    {
+     "type": "plank",
+     "x": 1164.4,
+     "y": 548.8,
+     "angle": 0.152
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "label": "Alternar as duas rotas com uma portinhola para evitar congestionamento no bols\u00e3o",
+   "manual": true,
+   "devices": []
+  }
+ ]
+}

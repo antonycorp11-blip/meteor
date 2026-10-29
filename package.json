@@ -1,0 +1,23 @@
+{
+  "name": "meteor-mill",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Meteor Mill — quebre o asteroide, alimente o buraco negro. Jogo de física 2D com engenhocas.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "matter-js": "^0.20.0"
+  },
+  "devDependencies": {
+    "@types/matter-js": "^0.19.8",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}

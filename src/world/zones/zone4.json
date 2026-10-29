@@ -1,0 +1,475 @@
+{
+ "id": 4,
+ "key": "ions",
+ "name": "Mar\u00e9 de \u00cdons",
+ "subtitle": "Duas rotas ao redor de um arco rochoso",
+ "theme": "ion",
+ "intro": "Campos regionais e massas diferentes. Separe, curve e entregue.",
+ "width": 1360,
+ "height": 760,
+ "gravity": {
+  "x": 0,
+  "y": 1
+ },
+ "terrain": [
+  [
+   [
+    0,
+    90
+   ],
+   [
+    24,
+    90
+   ],
+   [
+    24,
+    260
+   ],
+   [
+    0,
+    260
+   ]
+  ],
+  [
+   [
+    0,
+    260
+   ],
+   [
+    170,
+    260
+   ],
+   [
+    170,
+    760
+   ],
+   [
+    0,
+    760
+   ]
+  ],
+  [
+   [
+    170,
+    260
+   ],
+   [
+    300,
+    305
+   ],
+   [
+    300,
+    760
+   ],
+   [
+    170,
+    760
+   ]
+  ],
+  [
+   [
+    300,
+    690
+   ],
+   [
+    1000,
+    735
+   ],
+   [
+    1000,
+    760
+   ],
+   [
+    300,
+    760
+   ]
+  ],
+  [
+   [
+    440,
+    230
+   ],
+   [
+    920,
+    275
+   ],
+   [
+    920,
+    540
+   ],
+   [
+    440,
+    540
+   ]
+  ],
+  [
+   [
+    380,
+    0
+   ],
+   [
+    1000,
+    0
+   ],
+   [
+    1000,
+    105
+   ],
+   [
+    380,
+    105
+   ]
+  ],
+  [
+   [
+    1000,
+    0
+   ],
+   [
+    1060,
+    0
+   ],
+   [
+    1060,
+    520
+   ],
+   [
+    1000,
+    520
+   ]
+  ],
+  [
+   [
+    1000,
+    736
+   ],
+   [
+    1180,
+    750
+   ],
+   [
+    1180,
+    760
+   ],
+   [
+    1000,
+    760
+   ]
+  ],
+  [
+   [
+    1180,
+    750
+   ],
+   [
+    1360,
+    750
+   ],
+   [
+    1360,
+    760
+   ],
+   [
+    1180,
+    760
+   ]
+  ],
+  [
+   [
+    1320,
+    380
+   ],
+   [
+    1360,
+    380
+   ],
+   [
+    1360,
+    750
+   ],
+   [
+    1320,
+    750
+   ]
+  ],
+  [
+   [
+    1060,
+    0
+   ],
+   [
+    1360,
+    0
+   ],
+   [
+    1360,
+    120
+   ],
+   [
+    1060,
+    120
+   ]
+  ]
+ ],
+ "asteroid": {
+  "x": 150,
+  "y": 190,
+  "r": 40
+ },
+ "blackHole": {
+  "x": 1220,
+  "y": 700,
+  "attractRadius": 95,
+  "absorbRadius": 15,
+  "strength": 1000
+ },
+ "noBuild": [],
+ "fields": [
+  {
+   "id": "vento",
+   "label": "Vento i\u00f4nico",
+   "x": 920,
+   "y": 280,
+   "w": 80,
+   "h": 360,
+   "ax": -200,
+   "ay": 0
+  }
+ ],
+ "regions": [
+  {
+   "id": "superior",
+   "label": "Corredor superior",
+   "x": 500,
+   "y": 105,
+   "w": 360,
+   "h": 160
+  },
+  {
+   "id": "inferior",
+   "label": "Corredor inferior",
+   "x": 500,
+   "y": 540,
+   "w": 360,
+   "h": 190
+  }
+ ],
+ "tools": [
+  "attractor",
+  "repulsor",
+  "damper"
+ ],
+ "startCredits": 120,
+ "priceMult": 1.3,
+ "fragmentTable": [
+  {
+   "type": "common",
+   "weight": 0.45
+  },
+  {
+   "type": "dense",
+   "weight": 0.25
+  },
+  {
+   "type": "metallic",
+   "weight": 0.2
+  },
+  {
+   "type": "porous",
+   "weight": 0.1
+  }
+ ],
+ "efficiencyWindow": 60,
+ "goals": [
+  {
+   "id": "z4-basic",
+   "tier": "basic",
+   "title": "Alimente o buraco negro com 600 de massa",
+   "reqs": [
+    {
+     "kind": "mass",
+     "target": 600
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z4-eng",
+   "tier": "engineering",
+   "title": "60% de efici\u00eancia, 35 entregas autom\u00e1ticas e 20 densos absorvidos",
+   "reqs": [
+    {
+     "kind": "efficiency",
+     "pct": 60
+    },
+    {
+     "kind": "autoDeliveries",
+     "count": 35
+    },
+    {
+     "kind": "denseDelivered",
+     "count": 20
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z4-x1",
+   "tier": "extra",
+   "title": "Use as duas rotas na mesma instala\u00e7\u00e3o (10 + 10)",
+   "reqs": [
+    {
+     "kind": "bothRoutes",
+     "count": 10,
+     "regions": [
+      "superior",
+      "inferior"
+     ]
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z4-x2",
+   "tier": "extra",
+   "title": "10 entregas com curva gravitacional, sem lan\u00e7ador",
+   "reqs": [
+    {
+     "kind": "fieldCurve",
+     "count": 10
+    }
+   ],
+   "research": 2
+  }
+ ],
+ "hints": [
+  "O vento i\u00f4nico empurra mais os leves que os densos.",
+  "Campos n\u00e3o atravessam rocha: posicione-os com linha de vis\u00e3o.",
+  "Met\u00e1licos sentem os campos com muito mais for\u00e7a."
+ ],
+ "solutions": [
+  {
+   "id": "A",
+   "label": "Rota inferior: rampa longa de placas sob o arco e campo atrator curvando para o buraco negro",
+   "aim": {
+    "x": 230,
+    "y": 140
+   },
+   "pace": 60,
+   "expectRate": 0.5,
+   "devices": [
+    {
+     "type": "plank",
+     "x": 333.3,
+     "y": 572.8,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 397.7,
+     "y": 586.9,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 462.2,
+     "y": 601,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 526.7,
+     "y": 615.1,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 591.2,
+     "y": 629.2,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 655.6,
+     "y": 643.3,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 720.1,
+     "y": 657.4,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 784.6,
+     "y": 671.5,
+     "angle": 0.215
+    },
+    {
+     "type": "plank",
+     "x": 849.1,
+     "y": 685.6,
+     "angle": 0.215
+    },
+    {
+     "type": "attractor",
+     "x": 1102.5,
+     "y": 691.8,
+     "angle": 0,
+     "params": {
+      "strength": 0.4
+     }
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "label": "Rota superior: lan\u00e7ador com anteparo, topo do arco, queda pelo vento e rampa curva",
+   "aim": {
+    "x": 230,
+    "y": 140
+   },
+   "pace": 60,
+   "expectRate": 0.2,
+   "devices": [
+    {
+     "type": "launcher",
+     "x": 366.1,
+     "y": 359.7,
+     "angle": 0.381,
+     "params": {
+      "power": 11.87
+     }
+    },
+    {
+     "type": "plank",
+     "x": 361.5,
+     "y": 280.9,
+     "angle": 1.662
+    },
+    {
+     "type": "ramp",
+     "x": 948.5,
+     "y": 680,
+     "angle": 0.149
+    },
+    {
+     "type": "attractor",
+     "x": 1083.6,
+     "y": 637.3,
+     "angle": 0,
+     "params": {
+      "strength": 0.86
+     }
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "label": "Separar densos (rota inferior) e leves (rota superior) na mesma instala\u00e7\u00e3o",
+   "manual": true,
+   "devices": []
+  }
+ ]
+}

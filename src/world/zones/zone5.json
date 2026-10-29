@@ -1,0 +1,471 @@
+{
+ "id": 5,
+ "key": "catedral",
+ "name": "Catedral do Horizonte",
+ "subtitle": "Tr\u00eas barreiras sucessivas",
+ "theme": "cathedral",
+ "intro": "Tr\u00eas barreiras naturais. Componha seus sistemas.",
+ "width": 1600,
+ "height": 880,
+ "gravity": {
+  "x": 0,
+  "y": 1
+ },
+ "terrain": [
+  [
+   [
+    0,
+    100
+   ],
+   [
+    26,
+    100
+   ],
+   [
+    26,
+    300
+   ],
+   [
+    0,
+    300
+   ]
+  ],
+  [
+   [
+    0,
+    300
+   ],
+   [
+    190,
+    300
+   ],
+   [
+    190,
+    880
+   ],
+   [
+    0,
+    880
+   ]
+  ],
+  [
+   [
+    190,
+    300
+   ],
+   [
+    320,
+    345
+   ],
+   [
+    320,
+    880
+   ],
+   [
+    190,
+    880
+   ]
+  ],
+  [
+   [
+    320,
+    560
+   ],
+   [
+    400,
+    560
+   ],
+   [
+    400,
+    880
+   ],
+   [
+    320,
+    880
+   ]
+  ],
+  [
+   [
+    400,
+    300
+   ],
+   [
+    460,
+    300
+   ],
+   [
+    460,
+    880
+   ],
+   [
+    400,
+    880
+   ]
+  ],
+  [
+   [
+    460,
+    430
+   ],
+   [
+    1000,
+    560
+   ],
+   [
+    1000,
+    880
+   ],
+   [
+    460,
+    880
+   ]
+  ],
+  [
+   [
+    650,
+    0
+   ],
+   [
+    950,
+    0
+   ],
+   [
+    950,
+    140
+   ],
+   [
+    650,
+    140
+   ]
+  ],
+  [
+   [
+    760,
+    140
+   ],
+   [
+    840,
+    140
+   ],
+   [
+    840,
+    360
+   ],
+   [
+    760,
+    360
+   ]
+  ],
+  [
+   [
+    1000,
+    660
+   ],
+   [
+    1300,
+    720
+   ],
+   [
+    1300,
+    880
+   ],
+   [
+    1000,
+    880
+   ]
+  ],
+  [
+   [
+    1080,
+    0
+   ],
+   [
+    1140,
+    0
+   ],
+   [
+    1140,
+    600
+   ],
+   [
+    1080,
+    600
+   ]
+  ],
+  [
+   [
+    1140,
+    0
+   ],
+   [
+    1600,
+    0
+   ],
+   [
+    1600,
+    260
+   ],
+   [
+    1140,
+    260
+   ]
+  ],
+  [
+   [
+    1300,
+    820
+   ],
+   [
+    1600,
+    820
+   ],
+   [
+    1600,
+    880
+   ],
+   [
+    1300,
+    880
+   ]
+  ],
+  [
+   [
+    1560,
+    260
+   ],
+   [
+    1600,
+    260
+   ],
+   [
+    1600,
+    820
+   ],
+   [
+    1560,
+    820
+   ]
+  ],
+  [
+   [
+    1340,
+    260
+   ],
+   [
+    1400,
+    260
+   ],
+   [
+    1400,
+    640
+   ],
+   [
+    1340,
+    640
+   ]
+  ]
+ ],
+ "asteroid": {
+  "x": 150,
+  "y": 230,
+  "r": 44
+ },
+ "blackHole": {
+  "x": 1470,
+  "y": 772,
+  "attractRadius": 95,
+  "absorbRadius": 15,
+  "strength": 1000
+ },
+ "noBuild": [],
+ "fields": [],
+ "regions": [],
+ "tools": [
+  "arm",
+  "lift",
+  "autoextractor"
+ ],
+ "startCredits": 200,
+ "priceMult": 1.5,
+ "fragmentTable": [
+  {
+   "type": "common",
+   "weight": 0.4
+  },
+  {
+   "type": "porous",
+   "weight": 0.15
+  },
+  {
+   "type": "dense",
+   "weight": 0.15
+  },
+  {
+   "type": "metallic",
+   "weight": 0.12
+  },
+  {
+   "type": "glass",
+   "weight": 0.1
+  },
+  {
+   "type": "unstable",
+   "weight": 0.05
+  },
+  {
+   "type": "rare",
+   "weight": 0.03
+  }
+ ],
+ "efficiencyWindow": 75,
+ "goals": [
+  {
+   "id": "z5-basic",
+   "tier": "basic",
+   "title": "Alimente o buraco negro com 1.100 de massa",
+   "reqs": [
+    {
+     "kind": "mass",
+     "target": 1100
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z5-eng",
+   "tier": "engineering",
+   "title": "70% de efici\u00eancia (janela de 75), 100 entregas autom\u00e1ticas e 90 s est\u00e1veis",
+   "reqs": [
+    {
+     "kind": "efficiency",
+     "pct": 70
+    },
+    {
+     "kind": "autoDeliveries",
+     "count": 100
+    },
+    {
+     "kind": "stability",
+     "seconds": 90,
+     "maxCluster": 12,
+     "minRate": 20
+    }
+   ],
+   "research": 3
+  },
+  {
+   "id": "z5-x1",
+   "tier": "extra",
+   "title": "50 entregas em sequ\u00eancia",
+   "reqs": [
+    {
+     "kind": "streak",
+     "count": 50
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z5-x2",
+   "tier": "extra",
+   "title": "70% de efici\u00eancia usando no m\u00e1ximo 12 pe\u00e7as",
+   "reqs": [
+    {
+     "kind": "maxDevicesEff",
+     "maxDevices": 12,
+     "pct": 70
+    }
+   ],
+   "research": 2
+  },
+  {
+   "id": "z5-x3",
+   "tier": "extra",
+   "title": "Fluxo com 3 tipos de fragmento em 30 s",
+   "reqs": [
+    {
+     "kind": "typesFlow",
+     "types": 3,
+     "seconds": 30
+    }
+   ],
+   "research": 2
+  }
+ ],
+ "hints": [
+  "O elevador levita, mas n\u00e3o prende: algu\u00e9m precisa empurrar no topo.",
+  "Pense em cadeias: cada barreira pede uma resposta diferente.",
+  "Um autoextrator s\u00f3 ajuda se o transporte j\u00e1 funciona."
+ ],
+ "solutions": [
+  {
+   "id": "A",
+   "label": "Lan\u00e7ador no desfiladeiro (ritmo calmo), descida pelo plat\u00f4 e rampa curva antes da c\u00e2mara",
+   "aim": {
+    "x": 240,
+    "y": 160
+   },
+   "pace": 100,
+   "expectRate": 0.2,
+   "devices": [
+    {
+     "type": "launcher",
+     "x": 364.9,
+     "y": 546.6,
+     "angle": 0.088,
+     "params": {
+      "power": 11.61
+     }
+    },
+    {
+     "type": "ramp",
+     "x": 1066,
+     "y": 617.5,
+     "angle": 0.381
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "label": "Elevador de campo no desfiladeiro, ventilador empurrando no topo e rampa curva",
+   "aim": {
+    "x": 240,
+    "y": 160
+   },
+   "pace": 60,
+   "expectRate": 0.15,
+   "devices": [
+    {
+     "type": "lift",
+     "x": 371.7,
+     "y": 554,
+     "angle": 0.06,
+     "params": {
+      "strength": 0.72
+     }
+    },
+    {
+     "type": "fan",
+     "x": 341.7,
+     "y": 297.2,
+     "angle": -0.078,
+     "params": {
+      "strength": 0.91
+     }
+    },
+    {
+     "type": "ramp",
+     "x": 1077.5,
+     "y": 637.5,
+     "angle": 0.237
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "label": "Rotas paralelas (lan\u00e7ador + elevador) com bra\u00e7o basculante e autoextrator para volume",
+   "manual": true,
+   "devices": []
+  }
+ ]
+}
