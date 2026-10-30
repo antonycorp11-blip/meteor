@@ -973,6 +973,119 @@ input[type='range'] {
   max-width: 600px;
   text-align: center;
 }
+.menu-card.screen-memo {
+  max-width: 560px;
+}
+
+/* memorandos da Singularis */
+.memo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin: 4px 0 10px;
+  border-bottom: 2px dashed rgba(169, 159, 212, 0.35);
+  font-family: var(--pixel);
+  font-size: 0.82em;
+  letter-spacing: 0.12em;
+}
+.memo-logo {
+  color: var(--cyan);
+}
+.memo-tag {
+  color: var(--muted);
+}
+.memo-from {
+  font-size: 0.78em;
+  color: var(--muted);
+}
+.memo-title {
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: 1.45em;
+  color: var(--core);
+  margin: 6px 0 10px;
+}
+.memo-p {
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+.screen-complete .memo-p {
+  max-width: 470px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.screen-memo .menu-buttons {
+  margin-top: 16px;
+}
+
+/* mapa do sistema */
+.sys-map-wrap {
+  margin: 0 0 10px;
+  background: radial-gradient(ellipse at center, rgba(122, 48, 200, 0.22), rgba(5, 3, 12, 0) 70%);
+}
+.sys-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 34vh;
+}
+.sm-orbit {
+  fill: none;
+  stroke: rgba(169, 159, 212, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.sm-orbit.done {
+  stroke: rgba(255, 179, 75, 0.22);
+}
+.sm-disk {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: sm-pulse 3.2s ease-in-out infinite;
+}
+@keyframes sm-pulse {
+  50% {
+    opacity: 0.75;
+  }
+}
+.sm-label {
+  font-family: var(--pixel);
+  font-size: 9px;
+  fill: var(--text);
+  text-anchor: middle;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.sm-label.hole {
+  fill: var(--core);
+}
+.sm-planet {
+  cursor: pointer;
+}
+.sm-planet:hover circle,
+.sm-planet:focus circle {
+  filter: brightness(1.35);
+}
+.sm-planet.locked {
+  opacity: 0.4;
+  cursor: default;
+}
+.sm-planet.done .sm-label {
+  fill: var(--muted);
+}
+.sm-ghost {
+  fill: none;
+  stroke: rgba(255, 179, 75, 0.6);
+  stroke-dasharray: 2 2;
+}
+.sm-ring {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+  animation: sm-pulse 1.4s ease-in-out infinite;
+}
 .menu-head {
   display: flex;
   justify-content: space-between;

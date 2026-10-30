@@ -2,10 +2,11 @@ import { MUSIC_INFO } from '../audio/MusicEngine';
 import { Config } from '../core/Config';
 import { FRAGMENT_TYPES } from '../physics/fragmentTypes';
 import type { Settings } from '../save/SaveManager';
+import { INTRO, PLANETS, SENDER, SYSTEM, planet, type Memo } from '../story/Story';
 import { clear, fmt, h, icon } from './dom';
 import type { GameApi } from './GameApi';
 
-type Screen = 'title' | 'zones' | 'settings' | 'stats' | 'goals' | 'help' | 'complete' | 'confirm';
+type Screen = 'title' | 'zones' | 'settings' | 'stats' | 'goals' | 'help' | 'complete' | 'confirm' | 'memo';
 
 /** Telas sobrepostas: título, zonas, desafios, ajustes, estatísticas… */
 export class Menus {
@@ -18,7 +19,7 @@ export class Menus {
   constructor(api: GameApi) {
     this.api = api;
     this.card = h('div', { class: 'menu-card' });
-    this.root = h('div', { class: 'menu-overlay', onclick: (e) => e.target === this.root && this.screen !== 'title' && this.screen !== 'complete' && this.close() }, this.card);
+    this.root = h('div', { class: 'menu-overlay', onclick: (e) => e.target === this.root && this.screen !== 'title' && this.screen !== 'complete' && this.screen !== 'memo' && this.close() }, this.card);
   }
 
   isOpen() {
@@ -74,39 +75,109 @@ export class Menus {
           { class: 'logo' },
           h('div', { class: 'logo-meteor' }, 'METEOR'),
           h('div', { class: 'logo-mill' }, 'MILL'),
-          h('div', { class: 'logo-sub' }, 'QUEBRE O ASTEROIDE · ALIMENTE O BURACO NEGRO'),
+          h('div', { class: 'logo-sub' }, `SINGULARIS · CONTRATO ${SYSTEM.toUpperCase()}`),
         ),
         h(
           'nav',
           { class: 'title-menu' },
           item(started ? 'Continuar' : 'Jogar', () => this.api.play(), true),
-          item('Zonas', () => this.zones()),
+          item('Mapa do sistema', () => this.zones()),
           item('Árvore estelar', () => this.api.openTree()),
           item('Como jogar', () => this.help()),
           item('Ajustes', () => this.settings()),
         ),
-        h('div', { class: 'title-foot' }, started ? `◆ ${fmt(sv.credits)} · Zona ${sv.unlockedZone} de 5` : `Trilha original procedural · ${MUSIC_INFO.bpm} BPM`),
+        h('div', { class: 'title-foot' }, started ? `◆ ${fmt(sv.credits)} · Planeta ${planet(sv.unlockedZone).numeral} de V` : `Trilha original procedural · ${MUSIC_INFO.bpm} BPM`),
       ),
     );
   }
 
   zones() {
-    const cards = this.api.zoneCards().map((z) =>
-      h(
+    const zc = this.api.zoneCards();
+    const delivered = zc.filter((z) => z.complete).length;
+    // mapa: Ônix no centro, órbitas em perspectiva do mais próximo ao mais distante
+    const W = 520;
+    const H = 230;
+    const cx = W / 2;
+    const cy = H / 2;
+    const angles = [-0.5, 2.3, 0.85, 3.75, 5.35];
+    let svg = `<svg viewBox="0 0 ${W} ${H}" class="sys-map" role="img" aria-label="Mapa do sistema ${SYSTEM}">`;
+    svg += `<defs><radialGradient id="sm-disk"><stop offset="0" stop-color="#000"/><stop offset=".32" stop-color="#000"/><stop offset=".38" stop-color="#ffd27a"/><stop offset=".55" stop-color="#e0703a" stop-opacity=".8"/><stop offset="1" stop-color="#7a30c8" stop-opacity="0"/></radialGradient></defs>`;
+    const holeR = 20 + delivered * 3;
+    for (const z of zc) {
+      const rx = 62 + (z.id - 1) * 42;
+      svg += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${rx * 0.36}" class="sm-orbit ${z.complete ? 'done' : ''}"/>`;
+    }
+    svg += `<ellipse cx="${cx}" cy="${cy}" rx="${holeR * 1.9}" ry="${holeR * 0.75}" fill="url(#sm-disk)" class="sm-disk"/><circle cx="${cx}" cy="${cy}" r="${holeR * 0.42}" fill="#000" stroke="#ffd27a" stroke-width="1"/>`;
+    svg += `<text x="${cx}" y="${cy + holeR * 0.75 + 12}" class="sm-label hole">${SYSTEM.toUpperCase()}</text>`;
+    for (const z of zc) {
+      const p = PLANETS[z.id];
+      const rx = 62 + (z.id - 1) * 42;
+      const a = angles[z.id - 1];
+      const x = cx + Math.cos(a) * rx;
+      const y = cy + Math.sin(a) * rx * 0.36;
+      const cls = `sm-planet ${z.complete ? 'done' : ''} ${z.unlocked ? '' : 'locked'} ${z.current ? 'current' : ''}`;
+      svg += `<g class="${cls}" data-zone="${z.id}" tabindex="${z.unlocked ? 0 : -1}">`;
+      if (z.current) svg += `<circle cx="${x}" cy="${y}" r="${p.size + 6}" class="sm-ring"/>`;
+      if (z.complete) svg += `<circle cx="${x}" cy="${y}" r="${p.size}" class="sm-ghost"/>`;
+      else {
+        svg += `<circle cx="${x}" cy="${y}" r="${p.size}" fill="${p.color}"/>`;
+        svg += `<path d="M ${x} ${y - p.size} A ${p.size} ${p.size} 0 0 1 ${x} ${y + p.size} A ${p.size * 0.45} ${p.size} 0 0 0 ${x} ${y - p.size}" fill="${p.shade}" opacity=".85"/>`;
+      }
+      svg += `<text x="${x}" y="${y - p.size - 6}" class="sm-label">${p.numeral} · ${p.body.toUpperCase()}</text></g>`;
+    }
+    svg += '</svg>';
+    const map = h('div', { class: 'sys-map-wrap' });
+    map.innerHTML = svg;
+    map.querySelectorAll<SVGGElement>('.sm-planet').forEach((g) => {
+      const id = Number(g.dataset.zone);
+      const go = () => {
+        if (id > this.api.save.unlockedZone) return;
+        this.api.uiSound();
+        this.api.openZone(id);
+      };
+      g.addEventListener('click', go);
+      g.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && go());
+    });
+    const cards = zc.map((z) => {
+      const p = planet(z.id);
+      return h(
         'button',
         {
           class: `zone-card ${z.unlocked ? '' : 'locked'} ${z.complete ? 'complete' : ''} ${z.current ? 'current' : ''}`,
           disabled: !z.unlocked,
           onclick: () => (this.api.uiSound(), this.api.openZone(z.id)),
         },
-        h('div', { class: 'zc-num' }, `ZONA ${z.id}`),
+        h('div', { class: 'zc-num' }, `PLANETA ${p.numeral} · ${p.body.toUpperCase()}`),
         h('div', { class: 'zc-name' }, z.name),
-        h('div', { class: 'zc-sub' }, z.unlocked ? z.subtitle : 'O buraco negro anterior ainda não engoliu o mapa'),
+        h('div', { class: 'zc-sub' }, z.unlocked ? z.subtitle : 'Aguardando a entrega do planeta anterior'),
         h('div', { class: 'zc-bar' }, h('i', { style: `width:${Math.round(z.growth * 100)}%` })),
-        h('div', { class: 'zc-meta' }, z.complete ? 'Buraco negro supermassivo ✓' : z.unlocked ? `Buraco negro ${Math.floor(z.growth * 100)}%` : '—'),
-      ),
+        h('div', { class: 'zc-meta' }, z.complete ? 'Entregue a Ônix ✓' : z.unlocked ? `Semente ${Math.floor(z.growth * 100)}%` : '—'),
+      );
+    });
+    this.open(
+      'zones',
+      this.header(`Mapa do sistema ${SYSTEM}`, 'overview'),
+      map,
+      h('div', { class: 'zone-grid' }, ...cards),
+      h('p', { class: 'fineprint' }, 'Cada planeta guarda as peças que você construiu. Créditos e a Árvore estelar valem para todos.'),
     );
-    this.open('zones', this.header('Zonas', 'overview'), h('div', { class: 'zone-grid' }, ...cards), h('p', { class: 'fineprint' }, 'Cada zona guarda as peças que você construiu. Créditos e a Árvore estelar valem para todas.'));
+  }
+
+  /** Memorando da Singularis (história). */
+  memo(m: Memo, button: string, next: () => void, extra?: Node) {
+    this.open(
+      'memo',
+      h('div', { class: 'memo-head' }, h('span', { class: 'memo-logo' }, '◉ SINGULARIS'), h('span', { class: 'memo-tag' }, 'MEMORANDO INTERNO')),
+      h('div', { class: 'memo-from' }, `De: ${SENDER}`),
+      h('h2', { class: 'memo-title' }, m.title),
+      ...m.body.map((p) => h('p', { class: 'memo-p' }, p)),
+      extra ?? null,
+      h('div', { class: 'menu-buttons' }, h('button', { class: 'px-btn amber big', onclick: () => (this.api.uiSound(), next()) }, button)),
+    );
+  }
+
+  intro(next: () => void) {
+    this.memo(INTRO, 'Aceitar o contrato', next);
   }
 
   goals() {
@@ -228,15 +299,18 @@ export class Menus {
     );
   }
 
-  complete(zoneName: string, next: { id: number; name: string } | null, campaign: boolean, earned: number) {
+  complete(zoneId: number, next: { id: number; name: string } | null, campaign: boolean, earned: number, recovered: number) {
     const btns: Node[] = [];
-    if (next) btns.push(h('button', { class: 'px-btn amber big', onclick: () => (this.api.uiSound(), this.api.openZone(next.id)) }, `Seguir para a Zona ${next.id} · ${next.name}`));
+    if (next) btns.push(h('button', { class: 'px-btn amber big', onclick: () => (this.api.uiSound(), this.api.openZone(next.id)) }, `Seguir para o Planeta ${planet(next.id).numeral} · ${planet(next.id).body}`));
     btns.push(h('button', { class: 'px-btn big', onclick: () => (this.api.uiSound(), this.close()) }, next ? 'Ficar e continuar minerando' : 'Continuar'));
+    const d = planet(zoneId).debrief;
     this.open(
       'complete',
-      h('div', { class: 'complete-title' }, 'SUPERMASSIVO!'),
-      h('p', { class: 'tagline' }, campaign ? `O buraco negro de ${zoneName} engoliu o mapa — a campanha está completa! O Sensor foi liberado na Árvore estelar.` : `O buraco negro de ${zoneName} cresceu até engolir o mapa inteiro.`),
-      h('p', { class: 'complete-reward' }, `Bônus: ◆ ${fmt(earned)}`),
+      h('div', { class: 'complete-title' }, next ? 'PLANETA ENTREGUE!' : `${SYSTEM.toUpperCase()} SUPERMASSIVO!`),
+      h('div', { class: 'memo-head' }, h('span', { class: 'memo-logo' }, '◉ SINGULARIS'), h('span', { class: 'memo-tag' }, d.title.toUpperCase())),
+      ...d.body.map((p) => h('p', { class: 'memo-p' }, p)),
+      campaign ? h('p', { class: 'tagline' }, 'O Sensor de passagem foi liberado na Árvore estelar.') : null,
+      h('p', { class: 'complete-reward' }, `Bônus do contrato: ◆ ${fmt(earned)}`, recovered > 0 ? h('br') : null, recovered > 0 ? `Módulos recuperados: ◆ ${fmt(recovered)}` : null),
       h('div', { class: 'menu-buttons' }, ...btns),
     );
   }

@@ -1,3 +1,4 @@
+import { planet } from '../story/Story';
 import { AudioBus } from '../audio/AudioBus';
 import { MusicEngine } from '../audio/MusicEngine';
 import { SfxEngine } from '../audio/SfxEngine';
@@ -244,7 +245,6 @@ export class Game implements GameApi {
     const fz = cam.fitZoom();
     const oc = cam.overviewCenter(fz);
     cam.snap(oc.x, oc.y, fz);
-    if (!initial) this.hud.banner(`ZONA ${zone.id} · ${zone.name.toUpperCase()}`, zone.intro);
     zs.visited = true;
     this.refreshDock();
     this.persist();
@@ -351,12 +351,37 @@ export class Game implements GameApi {
     if (id > this.save.unlockedZone) return;
     this.menus.close();
     if (id !== this.zone.id) this.openZoneInternal(id);
-    else this.hud.banner(`ZONA ${id} · ${this.zone.name.toUpperCase()}`, this.zone.intro);
+    this.storyThen(() => this.zoneBanner());
   }
 
   play() {
     this.menus.close();
-    this.hud.banner(`ZONA ${this.zone.id} · ${this.zone.name.toUpperCase()}`, this.zone.intro);
+    this.storyThen(() => this.zoneBanner());
+  }
+
+  private zoneBanner() {
+    const p = planet(this.zone.id);
+    this.hud.banner(`PLANETA ${p.numeral} · ${this.zone.name.toUpperCase()}`, this.zone.intro);
+  }
+
+  /** Mostra os memorandos pendentes (contrato, briefing do planeta) e depois segue. */
+  private storyThen(done: () => void) {
+    const st = this.save.story;
+    if (!st.intro) {
+      st.intro = true;
+      this.persist();
+      this.menus.intro(() => this.storyThen(done));
+      return;
+    }
+    const zid = this.zone.id;
+    if (!st.briefed.includes(zid)) {
+      st.briefed.push(zid);
+      this.persist();
+      this.menus.memo(planet(zid).briefing, 'Iniciar operação', () => this.storyThen(done));
+      return;
+    }
+    this.menus.close();
+    done();
   }
 
   reachedZone() {
@@ -532,7 +557,14 @@ export class Game implements GameApi {
     this.zsave.complete = true;
     const zid = this.zone.id;
     const bonus = Math.round(this.zone.growthTarget * 0.25);
-    this.wallet.earn(bonus);
+    // as peças instaladas são recuperadas antes do planeta cair em Ônix
+    let paid = 0;
+    for (const d of this.sim.devices.values()) {
+      paid += d.paid;
+      d.paid = 0;
+    }
+    const recovered = Math.round(paid * 0.5);
+    this.wallet.earn(bonus + recovered);
     let next: { id: number; name: string } | null = null;
     let campaign = false;
     if (zid < ZONES.length) {
@@ -545,7 +577,7 @@ export class Game implements GameApi {
     }
     this.persist(true);
     this.refreshDock();
-    this.menus.complete(this.zone.name, next, campaign, bonus);
+    this.menus.complete(zid, next, campaign, bonus, recovered);
   }
 
   private updateHold() {

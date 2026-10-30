@@ -9,6 +9,7 @@ const { chromium } = require('playwright');
   page.on('console', (m) => m.type() === 'error' && logs.push(`[error] ${m.text()}`));
   await page.goto(url);
   await page.waitForTimeout(600);
+  await page.evaluate(() => (window.meteorMill.save.story = { intro: true, briefed: [1, 2, 3, 4, 5] }));
   await page.getByText(/Jogar|Continuar/).first().click();
   for (const zid of [1, 2, 3, 4, 5]) {
     await page.evaluate((zid) => {

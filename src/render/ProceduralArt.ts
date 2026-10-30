@@ -192,6 +192,57 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
     r: S * (0.55 + hash2(cx, cy, seed + 13) * 0.3),
     id: cx * 7919 + cy,
   });
+  // planetas distantes: alvenaria dos Construtores com glifos que ainda brilham
+  const ruins = zone.theme === 'ion' || zone.theme === 'cathedral';
+  const glyphCol = hexToRgb(theme.crystal[2]);
+  const glyphHot = hexToRgb(theme.crystal[3]);
+  const BW = 34;
+  const BH = 16;
+  const ruinPixel = (x: number, y: number, d: number, i: number): number[] => {
+    const nx = at(dv, x - 1, y) - at(dv, x + 1, y);
+    const ny = at(dv, x, y - 1) - at(dv, x, y + 1);
+    const l = Math.hypot(nx, ny) || 1;
+    const facing = d < 7 ? (nx / l) * LIGHT.x + (ny / l) * LIGHT.y : 0;
+    const oy = d < 7 ? ny / l : 0;
+    const row = Math.floor(y / BH);
+    const off = (row % 2) * (BW / 2) + Math.floor(hash2(row, 1, seed + 90) * 6);
+    const col = Math.floor((x + off) / BW);
+    const lx = x + off - col * BW;
+    const ly = y - row * BH;
+    const id = col * 7919 + row * 31;
+    const hb = hash2(col, row, seed + 91);
+    const depth = Math.min(1, d / 90);
+    let t = 0.42 + (hb - 0.5) * 0.18 - depth * 0.25 + (fbm(x / 70, y / 50, seed + 50, 2) - 0.5) * 0.25 + (bayer(x, y) - 0.5) * 0.08;
+    const mortar = lx < 1 || ly < 1;
+    if (mortar) t -= 0.38;
+    else if (lx < 3 || ly < 3) t += 0.14;
+    else if (lx > BW - 3 || ly > BH - 3) t -= 0.12;
+    // blocos rachados ou faltando
+    if (hb > 0.94 && d > 6) t -= 0.3;
+    else if (hb > 0.88 && !mortar && Math.abs(lx - ly * 1.6 - hash2(id, 2, seed) * 10) < 0.8) t -= 0.3;
+    if (d < 5 && facing > 0.3) t += 0.3 * (1 - d / 5) + 0.08;
+    if (d < 6 && facing < -0.35) t -= 0.2;
+    let c = rock[Math.max(0, Math.min(5, Math.floor(t * 6)))];
+    if (d < 3.2 && facing > 0.45) c = rim;
+    if (d < 2.6 && oy < -0.75 && hash2(x >> 1, y, seed + 21) > 0.4) c = dust;
+    // glifos gravados (alguns blocos) e um duto de energia a cada tantas fiadas
+    if (d > 5 && !mortar) {
+      if (hb > 0.8 && hb < 0.86 && lx > 7 && lx < BW - 7 && ly > 4 && ly < BH - 4) {
+        const gx = Math.floor((lx - 7) / 2);
+        const gy = Math.floor((ly - 4) / 2);
+        const on = hash2(id + gx, gy, seed + 92) > 0.55 && (gx + gy) % 2 === 0;
+        if (on) {
+          c = (x + y) % 5 === 0 ? glyphHot : glyphCol;
+          if ((x * 7 + y) % 13 === 0) glowPts.push({ x, y });
+        }
+      } else if (row % 9 === 4 && ly === 8 && hash2(col, 5, seed + 93) > 0.45) {
+        c = glyphCol;
+        if (x % 14 === 0) glowPts.push({ x, y });
+      }
+    }
+    void i;
+    return c;
+  };
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
@@ -199,6 +250,7 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
       const d = dv[i];
       let c: number[];
       if (d < 1.2) c = line;
+      else if (ruins) c = ruinPixel(x, y, d, i);
       else {
         let facing = 0;
         let oy = 0;
@@ -284,7 +336,7 @@ export function makeTerrainArt(zone: ZoneData, highContrast = false): TerrainArt
     gctx.fillStyle = grad;
     gctx.fillRect(gx - r, gy - r, r * 2, r * 2);
   };
-  for (const p of glowPts) lavaGlow(p.x, p.y, '#ff6a1e', 4, 0.22);
+  for (const p of glowPts) lavaGlow(p.x, p.y, ruins ? theme.crystal[2] : '#ff6a1e', 4, ruins ? 0.3 : 0.22);
 
   // --- poucos cristais embutidos (com brilho)
   const rng = new Rng(seed + 77);

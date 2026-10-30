@@ -45,6 +45,8 @@ export interface SaveData {
   settings: Settings;
   zones: Record<string, ZoneSave>;
   tutorial: { extracted: boolean; grabbed: boolean; delivered: boolean; built: boolean; heat: boolean; tree: boolean };
+  /** memorandos da história já lidos */
+  story: { intro: boolean; briefed: number[] };
 }
 
 export function defaultSettings(): Settings {
@@ -77,6 +79,7 @@ export function defaultSave(): SaveData {
     settings: defaultSettings(),
     zones: {},
     tutorial: { extracted: false, grabbed: false, delivered: false, built: false, heat: false, tree: false },
+    story: { intro: false, briefed: [] },
   };
 }
 
@@ -116,6 +119,10 @@ export function migrate(raw: unknown): SaveData {
     tree: { owned: Array.from(new Set(['core', ...(Array.isArray(tree.owned) ? tree.owned : [])])) },
     settings: { ...base.settings, ...((d.settings as Partial<Settings>) ?? {}) },
     tutorial: { ...base.tutorial, ...((d.tutorial as Partial<SaveData['tutorial']>) ?? {}) },
+    story: {
+      intro: Boolean((d.story as Partial<SaveData['story']>)?.intro),
+      briefed: Array.isArray((d.story as Partial<SaveData['story']>)?.briefed) ? ((d.story as SaveData['story']).briefed.filter((n) => typeof n === 'number')) : [],
+    },
     zones: {},
   };
   for (const [k, z] of Object.entries(rawZones)) {

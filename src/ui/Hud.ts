@@ -1,3 +1,4 @@
+import { planet } from '../story/Story';
 import { fmt, h, icon } from './dom';
 import type { GameApi, HudData } from './GameApi';
 
@@ -134,7 +135,7 @@ export class Hud {
   update(d: HudData, showFps: boolean) {
     const credits = fmt(d.credits);
     this.set('credits', credits, () => (this.credits.textContent = credits));
-    this.set('zone', `${d.zoneId}${d.zoneName}`, () => (this.zoneName.textContent = `Zona ${d.zoneId} · ${d.zoneName}`));
+    this.set('zone', `${d.zoneId}${d.zoneName}`, () => (this.zoneName.textContent = `Planeta ${planet(d.zoneId).numeral} · ${d.zoneName}`));
     const gw = (d.growth * 100).toFixed(1);
     this.set('grow', gw, () => {
       this.growthFill.style.width = `${gw}%`;

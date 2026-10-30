@@ -10,6 +10,7 @@ const { chromium } = require('playwright');
   await page.goto(url);
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}-title.png` });
+  await page.evaluate(() => (window.meteorMill.save.story = { intro: true, briefed: [1, 2, 3, 4, 5] }));
   await page.getByText(/Jogar|Continuar/).first().click();
   await page.waitForTimeout(500);
   const g = () => page.evaluate(() => {
