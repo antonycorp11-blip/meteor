@@ -107,6 +107,7 @@ export class Game implements GameApi {
   private collapseT = 0;
   private visualGrowth = 0;
   private treeHintShown = false;
+  private perf = { sim: 0, render: 0, frames: 0 };
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     installFrames();
@@ -413,6 +414,7 @@ export class Game implements GameApi {
     }
 
     const stepSec = Config.stepMs / 1000;
+    const tSim = performance.now();
     if (!this.paused && !document.hidden) {
       this.acc += dt;
       let steps = 0;
@@ -429,6 +431,7 @@ export class Game implements GameApi {
     this.visualGrowth += (target - this.visualGrowth) * Math.min(1, dt * 2);
     this.sim.holeGrowth = this.visualGrowth;
     this.updateCollapse(dt);
+    this.perf.sim += performance.now() - tSim;
 
     this.updateHold();
     this.desktop.update(dt);
@@ -463,6 +466,7 @@ export class Game implements GameApi {
     }
     this.updateCursorKind();
 
+    const tRender = performance.now();
     const sel = this.selectedDevice();
     const shakeAmt = this.save.settings.noShake ? 0 : this.shake;
     this.renderer.render(
@@ -490,6 +494,16 @@ export class Game implements GameApi {
       },
       dt,
     );
+    this.perf.render += performance.now() - tRender;
+    this.perf.frames++;
+  }
+
+  /** Médias de tempo por quadro (ms) desde a última leitura — usado em testes de desempenho. */
+  perfSample() {
+    const f = Math.max(1, this.perf.frames);
+    const out = { sim: this.perf.sim / f, render: this.perf.render / f, frames: this.perf.frames, fps: this.fps };
+    this.perf = { sim: 0, render: 0, frames: 0 };
+    return out;
   }
 
   /** Quando a barra enche, o buraco negro engole o mapa e a zona termina. */

@@ -1,5 +1,4 @@
 import '@fontsource/silkscreen/400.css';
-import '@fontsource/silkscreen/700.css';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/600.css';
 import './ui/styles.css';

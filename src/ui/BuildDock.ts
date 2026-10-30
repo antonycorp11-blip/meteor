@@ -108,8 +108,10 @@ export class BuildDock {
     for (const it of items) {
       const c = this.cards.get(it.type);
       if (!c) continue;
-      c.price.textContent = it.locked ? 'Árvore' : `◆ ${it.price}`;
-      c.el.classList.toggle('poor', !it.locked && !it.affordable);
+      const txt = it.locked ? 'Árvore' : `◆ ${it.price}`;
+      if (c.price.textContent !== txt) c.price.textContent = txt;
+      const poor = !it.locked && !it.affordable;
+      if (c.el.classList.contains('poor') !== poor) c.el.classList.toggle('poor', poor);
     }
   }
 

@@ -122,30 +122,55 @@ export class Hud {
     document.body.classList.toggle('hud-hidden', this.hidden);
   }
 
+  private last: Record<string, string | number | boolean> = {};
+
+  /** Só toca no DOM quando o valor muda (evita recalcular estilos à toa). */
+  private set(key: string, v: string | number | boolean, apply: () => void) {
+    if (this.last[key] === v) return;
+    this.last[key] = v;
+    apply();
+  }
+
   update(d: HudData, showFps: boolean) {
-    this.credits.textContent = fmt(d.credits);
-    this.zoneName.textContent = `Zona ${d.zoneId} · ${d.zoneName}`;
-    this.growthFill.style.width = `${(d.growth * 100).toFixed(1)}%`;
-    this.growthPct.textContent = `${Math.floor(d.growth * 100)}%`;
-    this.growthLabel.textContent = d.growthLabel;
-    const heatFrac = d.heat;
-    this.heatFill.style.width = `${Math.round(heatFrac * 100)}%`;
-    this.heatMult.textContent = `×${d.heatMult.toFixed(1)}`;
-    this.heatBox.classList.toggle('hot', heatFrac > 0.66);
-    this.heatBox.classList.toggle('warm', heatFrac > 0.25 && heatFrac <= 0.66);
-    this.heatBox.title = `Calor: multiplicador ×${d.heatMult.toFixed(2)} (máximo ×${d.heatMax}). Toque para entender.`;
-    this.autoMine.textContent = d.autoMine > 0 ? `Mineração auto: 1 pedra / ${d.autoMine.toFixed(1)} s` : '';
-    this.pauseBtn.replaceChildren(icon(d.paused ? 'play' : 'pause', 20));
-    this.pauseBtn.title = d.paused ? 'Retomar (Espaço)' : 'Pausar (Espaço)';
-    this.pausedTag.style.display = d.paused ? 'block' : 'none';
-    this.treeBadge.textContent = d.affordableNodes > 0 ? String(d.affordableNodes) : '';
-    this.chalBadge.textContent = `${d.challengesDone}/${d.challengesTotal}`;
-    this.fps.textContent = showFps ? `${d.fps} fps · ${d.active}/${d.maxActive} corpos` : '';
-    this.ghostBar.classList.toggle('show', d.ghostActive);
+    const credits = fmt(d.credits);
+    this.set('credits', credits, () => (this.credits.textContent = credits));
+    this.set('zone', `${d.zoneId}${d.zoneName}`, () => (this.zoneName.textContent = `Zona ${d.zoneId} · ${d.zoneName}`));
+    const gw = (d.growth * 100).toFixed(1);
+    this.set('grow', gw, () => {
+      this.growthFill.style.width = `${gw}%`;
+      this.growthPct.textContent = `${Math.floor(d.growth * 100)}%`;
+    });
+    this.set('growLabel', d.growthLabel, () => (this.growthLabel.textContent = d.growthLabel));
+    const heatPct = Math.round(d.heat * 100);
+    this.set('heat', heatPct, () => {
+      this.heatFill.style.width = `${heatPct}%`;
+      this.heatBox.classList.toggle('hot', d.heat > 0.66);
+      this.heatBox.classList.toggle('warm', d.heat > 0.25 && d.heat <= 0.66);
+    });
+    const mult = `×${d.heatMult.toFixed(1)}`;
+    this.set('mult', mult, () => {
+      this.heatMult.textContent = mult;
+      this.heatBox.title = `Calor: multiplicador ${mult} (máximo ×${d.heatMax}). Toque para entender.`;
+    });
+    const am = d.autoMine > 0 ? `Mineração auto: 1 pedra / ${d.autoMine.toFixed(1)} s` : '';
+    this.set('auto', am, () => (this.autoMine.textContent = am));
+    this.set('paused', d.paused, () => {
+      this.pauseBtn.replaceChildren(icon(d.paused ? 'play' : 'pause', 20));
+      this.pauseBtn.title = d.paused ? 'Retomar (Espaço)' : 'Pausar (Espaço)';
+      this.pausedTag.style.display = d.paused ? 'block' : 'none';
+    });
+    this.set('tree', d.affordableNodes, () => (this.treeBadge.textContent = d.affordableNodes > 0 ? String(d.affordableNodes) : ''));
+    this.set('chal', `${d.challengesDone}/${d.challengesTotal}`, () => (this.chalBadge.textContent = `${d.challengesDone}/${d.challengesTotal}`));
+    const fpsTxt = showFps ? `${d.fps} fps · ${d.active}/${d.maxActive} corpos` : '';
+    this.set('fps', fpsTxt, () => (this.fps.textContent = fpsTxt));
+    this.set('ghost', d.ghostActive, () => this.ghostBar.classList.toggle('show', d.ghostActive));
     if (d.ghostActive) {
-      this.ghostInfo.textContent = d.ghostValid ? `◆ ${d.ghostPrice}` : d.ghostReason;
-      this.ghostInfo.classList.toggle('bad', !d.ghostValid);
-      this.ghostOk.disabled = !d.ghostValid;
+      const gi = d.ghostValid ? `◆ ${d.ghostPrice}` : d.ghostReason;
+      this.set('ghostInfo', `${gi}${d.ghostValid}`, () => {
+        this.ghostInfo.textContent = gi;
+        this.ghostInfo.classList.toggle('bad', !d.ghostValid);
+        this.ghostOk.disabled = !d.ghostValid;
+      });
     }
   }
 

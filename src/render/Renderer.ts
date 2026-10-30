@@ -9,7 +9,6 @@ import { PAL, THEMES } from './palette';
 import { Particles } from './Particles';
 import { drawPixelText, textWidth } from './PixelFont';
 import {
-  GLOW_SCALE,
   arrowSprite,
   cursorArt,
   deviceArt,
@@ -21,7 +20,6 @@ import {
   makeGlowSprite,
   makeSky,
   makeTerrainArt,
-  makeVignette,
   type AsteroidArt,
   type BackgroundArt,
   type BlackHoleArt,
@@ -109,11 +107,14 @@ interface Meteor {
  */
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  /** o próprio canvas da página trabalha na resolução do buffer; o CSS amplia (pixelated) */
   readonly buffer: HTMLCanvasElement;
   private bctx: CanvasRenderingContext2D;
-  private glow: HTMLCanvasElement;
-  private gctx: CanvasRenderingContext2D;
+  /** camadas estáticas: céu+estrelas+nebulosa e terreno+brilho dos cristais */
+  private backLayer: HTMLCanvasElement = makeCanvas(1, 1);
+  private terrainLayer: HTMLCanvasElement = makeCanvas(1, 1);
+  private backKey = '';
+  private terrainKey = '';
   readonly camera = new Camera();
   readonly particles = new Particles(700);
   pixelScale = 2;
@@ -126,7 +127,6 @@ export class Renderer {
   private bigHole: BlackHoleArt | null = null;
   private bg: BackgroundArt | null = null;
   private sky: HTMLCanvasElement | null = null;
-  private vignette: HTMLCanvasElement | null = null;
   private fragSprites = new Map<number, Sprite>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
   private meteors: Meteor[] = [];
@@ -136,11 +136,8 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
-    this.buffer = makeCanvas(640, 360);
-    this.bctx = this.buffer.getContext('2d')!;
-    this.glow = makeCanvas(160, 90);
-    this.gctx = this.glow.getContext('2d')!;
+    this.buffer = canvas;
+    this.bctx = canvas.getContext('2d', { alpha: false })!;
   }
 
   setInsetsCss(top: number, bottom: number, left = 0) {
@@ -165,26 +162,30 @@ export class Renderer {
     const bw = Math.ceil(devW / scale);
     const bh = Math.ceil(devH / scale);
     const changed = bw !== this.buffer.width || bh !== this.buffer.height;
-    this.buffer.width = bw;
-    this.buffer.height = bh;
-    this.canvas.width = bw * scale;
-    this.canvas.height = bh * scale;
+    if (changed) {
+      this.buffer.width = bw;
+      this.buffer.height = bh;
+      this.backLayer.width = bw;
+      this.backLayer.height = bh;
+      this.terrainLayer.width = bw;
+      this.terrainLayer.height = bh;
+      this.backKey = '';
+      this.terrainKey = '';
+    }
     this.canvas.style.width = `${(bw * scale) / dpr}px`;
     this.canvas.style.height = `${(bh * scale) / dpr}px`;
-    this.glow.width = Math.ceil(bw / GLOW_SCALE);
-    this.glow.height = Math.ceil(bh / GLOW_SCALE);
     this.camera.setView(bw, bh);
     const k = dpr / scale;
     this.camera.setInsets(this.insetCss.top * k, this.insetCss.bottom * k, this.insetCss.left * k);
     this.bctx.imageSmoothingEnabled = false;
-    this.ctx.imageSmoothingEnabled = false;
     if ((changed || !this.sky) && this.zone) this.buildScreenLayers();
   }
 
   private buildScreenLayers() {
     const t = THEMES[this.zone!.theme];
     this.sky = makeSky(t, this.buffer.width, this.buffer.height);
-    this.vignette = makeVignette(this.buffer.width, this.buffer.height);
+    this.backKey = '';
+    this.terrainKey = '';
   }
 
   cssToBuffer(cx: number, cy: number): Vec {
@@ -203,6 +204,7 @@ export class Renderer {
   setZone(zone: ZoneData, highContrast: boolean) {
     this.zone = zone;
     this.terrain = makeTerrainArt(zone, highContrast);
+    this.terrainKey = '';
     this.asteroid = makeAsteroid(zone.asteroid.r, zone.id * 31 + 5);
     this.hole = makeBlackHole(zone.blackHole.absorbRadius);
     this.bg = makeBackground(zone);
@@ -216,6 +218,7 @@ export class Renderer {
 
   rebuildTerrain(highContrast: boolean) {
     if (this.zone) this.terrain = makeTerrainArt(this.zone, highContrast);
+    this.terrainKey = '';
   }
 
   forgetFragment(id: number) {
@@ -246,12 +249,12 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    if (this.sky) ctx.drawImage(this.sky, 0, 0);
     const cam = this.camera;
     const saved = { x: cam.x, y: cam.y };
-    cam.x = this.zone.width / 2 + Math.sin(time * 0.05) * 40;
+    cam.x = this.zone.width / 2;
     cam.y = this.zone.height / 2;
-    this.drawBackground(time, dt, W, H);
+    this.drawBackLayer(W, H);
+    this.drawBackAnimated(time, dt, W, H);
     cam.x = saved.x;
     cam.y = saved.y;
     // buraco negro gigante
@@ -275,29 +278,28 @@ export class Renderer {
     this.titleOrbit = this.titleOrbit.filter((o) => o.r > 52);
     const bc = this.bigHole.core;
     ctx.drawImage(bc.canvas, cx - bc.ox * s, cy - bc.oy * s, bc.canvas.width * s, bc.canvas.height * s);
-    // brilho
-    const g = this.gctx;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over';
-    g.clearRect(0, 0, this.glow.width, this.glow.height);
-    g.globalCompositeOperation = 'lighter';
-    const k = 1 / GLOW_SCALE;
-    const sz = 520 * s * k;
-    g.globalAlpha = 0.5;
-    g.drawImage(this.glowSprite('#7a30c8'), cx * k - sz / 2, cy * k - sz / 2, sz, sz);
-    g.globalAlpha = 0.3;
-    g.drawImage(this.glowSprite('#ff9a5a'), cx * k - sz / 5, cy * k - sz / 5, sz / 2.5, sz / 2.5);
-    g.globalAlpha = 1;
+    // brilho (sprites aditivos, sem passar pela tela inteira)
+    const sz = 520 * s;
+    this.additive(() => {
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(this.glowSprite('#7a30c8'), cx - sz / 2, cy - sz / 2, sz, sz);
+      ctx.globalAlpha = 0.3;
+      ctx.drawImage(this.glowSprite('#ff9a5a'), cx - sz / 5, cy - sz / 5, sz / 2.5, sz / 2.5);
+    });
+    ctx.drawImage(bc.canvas, cx - bc.ox * s, cy - bc.oy * s, bc.canvas.width * s, bc.canvas.height * s);
+    this.drawCursor(cursor, time);
+  }
+
+  /** Executa desenhos em modo aditivo e suavizado (brilhos), restaurando o estado. */
+  private additive(fn: () => void) {
+    const ctx = this.bctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.glow, 0, 0, this.glow.width * GLOW_SCALE, this.glow.height * GLOW_SCALE);
+    fn();
+    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(bc.canvas, cx - bc.ox * s, cy - bc.oy * s, bc.canvas.width * s, bc.canvas.height * s);
-    if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
-    this.drawCursor(cursor, time);
-    this.ctx.imageSmoothingEnabled = false;
-    this.ctx.drawImage(this.buffer, 0, 0, this.canvas.width, this.canvas.height);
   }
 
   // ------------------------------------------------------------------
@@ -324,8 +326,8 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    if (this.sky) ctx.drawImage(this.sky, 0, 0);
-    this.drawBackground(s.time, dt, W, H);
+    this.drawBackLayer(W, H);
+    this.drawBackAnimated(s.time, dt, W, H);
     if (s.highContrast) {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.fillRect(0, 0, W, H);
@@ -341,12 +343,31 @@ export class Renderer {
     this.drawAmbientFields(s, tx, ty);
     this.drawDeviceFields(s, tx, ty);
 
-    // --- terreno (some no colapso)
-    ctx.setTransform(z, 0, 0, z, tx, ty);
-    ctx.globalAlpha = Math.max(0, 1 - col * 1.4);
-    ctx.drawImage(this.terrain.tex, 0, 0);
-    ctx.globalAlpha = 1;
+    // --- terreno (camada cacheada; some no colapso)
+    const tx0 = Math.round(W / 2 - cam.x * z);
+    const ty0 = Math.round(H / 2 - cam.y * z);
+    const tkey = `${tx0},${ty0},${z.toFixed(5)}`;
+    if (tkey !== this.terrainKey) {
+      this.terrainKey = tkey;
+      const tc = this.terrainLayer.getContext('2d')!;
+      tc.setTransform(1, 0, 0, 1, 0, 0);
+      tc.clearRect(0, 0, W, H);
+      tc.imageSmoothingEnabled = false;
+      tc.setTransform(z, 0, 0, z, tx0, ty0);
+      tc.drawImage(this.terrain.tex, 0, 0);
+      // brilho dos cristais/veios embutido na camada
+      tc.setTransform(1, 0, 0, 1, 0, 0);
+      tc.globalCompositeOperation = 'lighter';
+      tc.imageSmoothingEnabled = true;
+      tc.globalAlpha = 0.85;
+      tc.drawImage(this.terrain.glow, tx0, ty0, zone.width * z, zone.height * z);
+      tc.globalAlpha = 1;
+      tc.globalCompositeOperation = 'source-over';
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = Math.max(0, 1 - col * 1.4);
+    ctx.drawImage(this.terrainLayer, tx - tx0, ty - ty0);
+    ctx.globalAlpha = 1;
     for (const f of zone.fields) {
       const b = cam.toBuffer(f.x + f.w / 2, f.y);
       const arrow = f.ax < 0 ? '<' : f.ax > 0 ? '>' : '';
@@ -447,7 +468,6 @@ export class Renderer {
     this.drawGlow(s, tx, ty, hs);
     drawHole(hc);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
     if (col > 0.85) {
       ctx.fillStyle = `rgba(255,240,220,${(col - 0.85) / 0.15})`;
       ctx.fillRect(0, 0, W, H);
@@ -501,30 +521,57 @@ export class Renderer {
     }
 
     this.drawCursor(s.cursor, s.time);
-    this.ctx.imageSmoothingEnabled = false;
-    this.ctx.drawImage(this.buffer, 0, 0, this.canvas.width, this.canvas.height);
   }
 
   // ------------------------------------------------------------------
   // Fundo animado
   // ------------------------------------------------------------------
 
-  private drawBackground(time: number, dt: number, W: number, H: number) {
-    const bg = this.bg!;
-    const ctx = this.bctx;
+  private par(x: number, y: number, p: number, W: number, H: number) {
     const cam = this.camera;
     const zw = this.zone!.width;
     const zh = this.zone!.height;
-    const ui = this.ui();
-    const tile = (img: HTMLCanvasElement, par: number, driftX = 0) => {
-      const tw = img.width;
-      const th = img.height;
-      const ox = -((((cam.x + driftX) * par) % tw) + tw) % tw;
-      const oy = -(((cam.y * par) % th) + th) % th;
-      for (let y = Math.floor(oy); y < H; y += th) for (let x = Math.floor(ox); x < W; x += tw) ctx.drawImage(img, x, y);
+    return {
+      x: Math.round(W / 2 + (x - zw / 2) * 0.9 - (cam.x - zw / 2) * p),
+      y: Math.round(H / 2 + (y - zh / 2) * 0.9 - (cam.y - zh / 2) * p),
     };
-    tile(bg.far, 0.03, time * 4);
-    // estrelas cintilantes: piscam de verdade (com cruz quando brilham)
+  }
+
+  /** Céu, estrelas e nebulosa: só são redesenhados quando a câmera se move. */
+  private drawBackLayer(W: number, H: number) {
+    const cam = this.camera;
+    const key = `${Math.round(cam.x * 0.1)},${Math.round(cam.y * 0.1)}`;
+    if (key !== this.backKey) {
+      this.backKey = key;
+      const bg = this.bg!;
+      const c = this.backLayer.getContext('2d')!;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.imageSmoothingEnabled = false;
+      if (this.sky) c.drawImage(this.sky, 0, 0);
+      const tile = (img: HTMLCanvasElement, par: number) => {
+        const tw = img.width;
+        const th = img.height;
+        const ox = -(((cam.x * par) % tw) + tw) % tw;
+        const oy = -(((cam.y * par) % th) + th) % th;
+        for (let y = Math.floor(oy); y < H; y += th) for (let x = Math.floor(ox); x < W; x += tw) c.drawImage(img, x, y);
+      };
+      tile(bg.far, 0.03);
+      const ns = bg.nebulaScale;
+      const np = this.par(-350, -220, 0.18, W, H);
+      c.drawImage(bg.nebula, np.x, np.y, bg.nebula.width * ns * 0.9, bg.nebula.height * ns * 0.9);
+      tile(bg.near, 0.1);
+    }
+    this.bctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.bctx.drawImage(this.backLayer, 0, 0);
+  }
+
+  /** O que se mexe no fundo: estrelas que piscam, galáxia, planetas, rochas à deriva e meteoros. */
+  private drawBackAnimated(time: number, dt: number, W: number, H: number) {
+    const bg = this.bg!;
+    const ctx = this.bctx;
+    const zw = this.zone!.width;
+    const zh = this.zone!.height;
+    const ui = this.ui();
     for (const t of bg.twinkles) {
       const v = 0.5 + 0.5 * Math.sin(time * t.s + t.p);
       const x = Math.round(t.x * W);
@@ -539,19 +586,11 @@ export class Renderer {
       }
     }
     ctx.globalAlpha = 1;
-    const par = (x: number, y: number, p: number) => ({
-      x: Math.round(W / 2 + (x - zw / 2) * 0.9 - (cam.x - zw / 2) * p),
-      y: Math.round(H / 2 + (y - zh / 2) * 0.9 - (cam.y - zh / 2) * p),
-    });
-    // nebulosa derivando lentamente
-    const ns = bg.nebulaScale;
-    const np = par(-350 + Math.sin(time * 0.02) * 30, -220 + Math.cos(time * 0.017) * 18, 0.18);
-    ctx.drawImage(bg.nebula, np.x, np.y, bg.nebula.width * ns * 0.9, bg.nebula.height * ns * 0.9);
     const gf = bg.galaxy[Math.floor(time * 0.6) % bg.galaxy.length];
-    const gp = par(bg.galaxyPos.x, bg.galaxyPos.y, 0.06);
+    const gp = this.par(bg.galaxyPos.x, bg.galaxyPos.y, 0.06, W, H);
     ctx.drawImage(gf.canvas, gp.x - gf.ox, gp.y - gf.oy);
     for (const p of bg.planets) {
-      const q = par(p.x, p.y, p.par);
+      const q = this.par(p.x, p.y, p.par, W, H);
       const frame = p.frames[Math.floor(((time / p.spin) % 1) * p.frames.length)];
       const ma = time * p.moonSpeed;
       const mx = q.x + Math.cos(ma) * p.moonOrbit;
@@ -561,8 +600,6 @@ export class Renderer {
       ctx.drawImage(frame.canvas, q.x - frame.ox, q.y - frame.oy);
       if (p.moon && !behind) ctx.drawImage(p.moon.canvas, Math.round(mx - p.moon.ox), Math.round(my - p.moon.oy));
     }
-    tile(bg.near, 0.1, time * 9);
-    // rochas distantes à deriva
     for (const r of bg.farRocks) {
       r.x += r.vx * dt;
       r.y += r.vy * dt;
@@ -570,7 +607,8 @@ export class Renderer {
       if (r.x > zw * 1.2) r.x = -zw * 0.2;
       if (r.y < -zh * 0.2) r.y = zh * 1.2;
       if (r.y > zh * 1.2) r.y = -zh * 0.2;
-      const q = par(r.x, r.y, r.par);
+      const q = this.par(r.x, r.y, r.par, W, H);
+      if (q.x < -40 || q.y < -40 || q.x > W + 40 || q.y > H + 40) continue;
       ctx.drawImage(r.sprite.canvas, q.x - r.sprite.ox, q.y - r.sprite.oy);
     }
     this.drawMeteors(time, dt, W, H);
@@ -626,58 +664,41 @@ export class Renderer {
     this.meteors = this.meteors.filter((m) => m.life > 0 && m.x > -80 && m.x < W + 80 && m.y < H + 80);
   }
 
+  /** Luzes dinâmicas como sprites aditivos pequenos (o brilho fixo do terreno já está na camada). */
   private drawGlow(s: RenderState, tx: number, ty: number, holeScale: number) {
-    const g = this.gctx;
-    const gw = this.glow.width;
-    const gh = this.glow.height;
+    const ctx = this.bctx;
+    const W = this.buffer.width;
+    const H = this.buffer.height;
     const z = this.camera.zoom;
-    const k = 1 / GLOW_SCALE;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over';
-    g.clearRect(0, 0, gw, gh);
-    g.globalCompositeOperation = 'lighter';
-    g.imageSmoothingEnabled = true;
     const zone = this.zone!;
-    g.globalAlpha = (0.85 + Math.sin(s.time * 0.8) * 0.1) * (1 - s.collapse);
-    g.drawImage(this.terrain!.glow, tx * k, ty * k, zone.width * z * k, zone.height * z * k);
+    const k = s.reduceGlow ? 0.45 : 1;
     const put = (wx: number, wy: number, color: string, worldSize: number, alpha: number) => {
-      const sz = worldSize * z * k;
-      if (sz < 0.5) return;
-      const x = (tx + wx * z) * k;
-      const y = (ty + wy * z) * k;
-      if (x < -sz || y < -sz || x > gw + sz || y > gh + sz) return;
-      g.globalAlpha = Math.min(1, alpha);
-      g.drawImage(this.glowSprite(color), x - sz / 2, y - sz / 2, sz, sz);
+      const sz = worldSize * z;
+      if (sz < 1 || alpha <= 0.01) return;
+      const x = tx + wx * z;
+      const y = ty + wy * z;
+      if (x < -sz || y < -sz || x > W + sz || y > H + sz) return;
+      ctx.globalAlpha = Math.min(1, alpha * k);
+      ctx.drawImage(this.glowSprite(color), x - sz / 2, y - sz / 2, sz, sz);
     };
-    const a = zone.asteroid;
-    put(a.x, a.y, '#ff7a2a', a.r * 4, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
-    const h = zone.blackHole;
-    put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4 * holeScale, 0.38);
-    // calor: o buraco negro esquenta de violeta para laranja/branco
-    put(h.x, h.y, '#ff7a2a', (h.absorbRadius + 30) * 2.6 * holeScale, 0.12 + s.heat * 0.45);
-    put(h.x, h.y, '#fff0c0', (h.absorbRadius + 8) * 2 * holeScale, s.heat * 0.35);
-    for (const f of s.sim.fragments.values()) put(f.body.position.x, f.body.position.y, fragmentGlowColor(f.type), 26, 0.32);
-    for (const d of s.sim.devices.values()) {
-      if (!d.enabled) continue;
-      const art = deviceArt(d.type);
-      const c = Math.cos(d.angle);
-      const sn = Math.sin(d.angle);
-      for (const l of art.lights) {
-        const wx = d.x + l.x * c - l.y * sn;
-        const wy = d.y + l.x * sn + l.y * c;
-        put(wx, wy, l.color, l.size * (1 + d.rt.flash), 0.35 + d.rt.flash * 0.5);
+    this.additive(() => {
+      const a = zone.asteroid;
+      put(a.x, a.y, '#ff7a2a', a.r * 4, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
+      const h = zone.blackHole;
+      put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4 * holeScale, 0.38);
+      put(h.x, h.y, '#ff7a2a', (h.absorbRadius + 30) * 2.6 * holeScale, 0.12 + s.heat * 0.45);
+      put(h.x, h.y, '#fff0c0', (h.absorbRadius + 8) * 2 * holeScale, s.heat * 0.35);
+      for (const f of s.sim.fragments.values()) put(f.body.position.x, f.body.position.y, fragmentGlowColor(f.type), 26, 0.32);
+      for (const d of s.sim.devices.values()) {
+        if (!d.enabled) continue;
+        const art = deviceArt(d.type);
+        const c = Math.cos(d.angle);
+        const sn = Math.sin(d.angle);
+        for (const l of art.lights) {
+          put(d.x + l.x * c - l.y * sn, d.y + l.x * sn + l.y * c, l.color, l.size * (1 + d.rt.flash), 0.35 + d.rt.flash * 0.5);
+        }
       }
-    }
-    g.globalAlpha = 1;
-    const b = this.bctx;
-    b.setTransform(1, 0, 0, 1, 0, 0);
-    b.globalCompositeOperation = 'lighter';
-    b.imageSmoothingEnabled = true;
-    b.globalAlpha = s.reduceGlow ? 0.45 : 1;
-    b.drawImage(this.glow, 0, 0, gw * GLOW_SCALE, gh * GLOW_SCALE);
-    b.globalAlpha = 1;
-    b.imageSmoothingEnabled = false;
-    b.globalCompositeOperation = 'source-over';
+    });
   }
 
   private drawAmbientFields(s: RenderState, tx: number, ty: number) {
