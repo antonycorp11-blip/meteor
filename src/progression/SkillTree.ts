@@ -32,40 +32,40 @@ export const BRANCH_INFO: Record<Branch, { name: string; color: string }> = {
 };
 
 export const TREE: TreeNode[] = [
-  { id: 'core', name: 'Núcleo da usina', desc: 'Libera a Placa. Tudo começa aqui.', branch: 'core', x: 0, y: 0, parents: [], cost: 0, unlock: 'plank', icon: 'star' },
+  { id: 'core', name: 'Núcleo da Singularis', desc: 'Libera a Viga orbital. Tudo começa aqui.', branch: 'core', x: 0, y: 0, parents: [], cost: 0, unlock: 'plank', icon: 'star' },
 
   // --- Mineração (para cima)
-  { id: 'pick1', name: 'Picareta afiada', desc: 'Golpes no asteroide 25% mais rápidos.', branch: 'mining', x: 0, y: -1, parents: ['core'], cost: 20, icon: 'pick', apply: (m) => (m.extractCooldownMul *= 0.75) },
-  { id: 'auto1', name: 'Mineração automática I', desc: 'O asteroide solta uma pedra sozinho a cada 3 s, na direção do seu último golpe.', branch: 'mining', x: 0, y: -2, parents: ['pick1'], cost: 40, icon: 'drill', apply: (m) => (m.autoMineInterval = 3) },
+  { id: 'pick1', name: 'Laser focalizado', desc: 'Disparos do laser de mineração 25% mais rápidos.', branch: 'mining', x: 0, y: -1, parents: ['core'], cost: 20, icon: 'pick', apply: (m) => (m.extractCooldownMul *= 0.75) },
+  { id: 'auto1', name: 'Mineração automática I', desc: 'O drone minera sozinho: uma pedra a cada 3 s, na direção do seu último disparo.', branch: 'mining', x: 0, y: -2, parents: ['pick1'], cost: 40, icon: 'drill', apply: (m) => (m.autoMineInterval = 3) },
   { id: 'auto2', name: 'Mineração automática II', desc: 'Uma pedra a cada 1,8 s.', branch: 'mining', x: 0, y: -3, parents: ['auto1'], cost: 220, icon: 'drill', apply: (m) => (m.autoMineInterval = 1.8) },
   { id: 'auto3', name: 'Mineração automática III', desc: 'Uma pedra a cada 1,1 s.', branch: 'mining', x: 0, y: -4, parents: ['auto2'], cost: 900, requiresZone: 3, icon: 'drill', apply: (m) => (m.autoMineInterval = 1.1) },
   { id: 'auto4', name: 'Mineração automática IV', desc: 'Uma pedra a cada 0,7 s.', branch: 'mining', x: 0, y: -5, parents: ['auto3'], cost: 3200, requiresZone: 4, icon: 'drill', apply: (m) => (m.autoMineInterval = 0.7) },
-  { id: 'double', name: 'Golpe duplo', desc: '15% de chance de soltar duas pedras por golpe.', branch: 'mining', x: -1, y: -2, parents: ['pick1'], cost: 120, icon: 'pick', apply: (m) => (m.multiExtractChance += 0.15) },
-  { id: 'double2', name: 'Golpe triplo', desc: '+20% de chance de pedra extra.', branch: 'mining', x: -1, y: -3, parents: ['double'], cost: 650, icon: 'pick', apply: (m) => (m.multiExtractChance += 0.2) },
+  { id: 'double', name: 'Feixe duplo', desc: '15% de chance de soltar duas pedras por disparo.', branch: 'mining', x: -1, y: -2, parents: ['pick1'], cost: 120, icon: 'pick', apply: (m) => (m.multiExtractChance += 0.15) },
+  { id: 'double2', name: 'Feixe triplo', desc: '+20% de chance de pedra extra.', branch: 'mining', x: -1, y: -3, parents: ['double'], cost: 650, icon: 'pick', apply: (m) => (m.multiExtractChance += 0.2) },
   { id: 'rich', name: 'Veios ricos', desc: 'Cada pedra vale 20% mais créditos.', branch: 'mining', x: 1, y: -2, parents: ['pick1'], cost: 160, icon: 'gem', apply: (m) => (m.fragmentValueMul *= 1.2) },
   { id: 'rich2', name: 'Veios profundos', desc: 'Mais 25% de créditos por pedra.', branch: 'mining', x: 1, y: -3, parents: ['rich'], cost: 750, requiresZone: 2, icon: 'gem', apply: (m) => (m.fragmentValueMul *= 1.25) },
 
   // --- Construção (para a direita)
-  { id: 'ramp', name: 'Rampa curva', desc: 'Libera a Rampa curva.', branch: 'build', x: 1, y: 0, parents: ['core'], cost: 15, unlock: 'ramp' },
-  { id: 'funnel', name: 'Funil', desc: 'Libera o Funil.', branch: 'build', x: 2, y: 0, parents: ['ramp'], cost: 30, unlock: 'funnel' },
-  { id: 'spring', name: 'Mola', desc: 'Libera a Mola, que arremessa na direção da seta.', branch: 'build', x: 3, y: 0, parents: ['funnel'], cost: 50, unlock: 'spring' },
-  { id: 'spring2', name: 'Mola reforçada', desc: 'Molas 20% mais fortes.', branch: 'build', x: 4, y: -1, parents: ['spring'], cost: 260, icon: 'up', apply: (m) => (m.springMul *= 1.2) },
-  { id: 'conveyor', name: 'Esteira', desc: 'Libera a Esteira.', branch: 'build', x: 2, y: 1, parents: ['ramp'], cost: 60, unlock: 'conveyor' },
-  { id: 'conveyor2', name: 'Esteira turbo', desc: 'Esteiras 40% mais rápidas.', branch: 'build', x: 3, y: 1, parents: ['conveyor'], cost: 300, icon: 'right', apply: (m) => (m.conveyorMul *= 1.4) },
-  { id: 'booster', name: 'Acelerador', desc: 'Libera o Acelerador.', branch: 'build', x: 4, y: 0, parents: ['spring'], cost: 150, requiresZone: 2, unlock: 'booster' },
-  { id: 'launcher', name: 'Lançador', desc: 'Libera o Lançador.', branch: 'build', x: 5, y: 0, parents: ['booster'], cost: 220, requiresZone: 2, unlock: 'launcher' },
-  { id: 'launcher2', name: 'Recarga rápida', desc: 'Lançadores recarregam 40% mais rápido.', branch: 'build', x: 6, y: 0, parents: ['launcher'], cost: 900, icon: 'up', apply: (m) => (m.launcherCadenceMul *= 0.6) },
-  { id: 'arm', name: 'Braço basculante', desc: 'Libera o Braço basculante.', branch: 'build', x: 5, y: 1, parents: ['launcher'], cost: 1200, requiresZone: 5, unlock: 'arm' },
-  { id: 'damper', name: 'Almofada', desc: 'Libera a Almofada.', branch: 'build', x: 3, y: 2, parents: ['conveyor'], cost: 120, requiresZone: 2, unlock: 'damper' },
-  { id: 'gate', name: 'Portinhola', desc: 'Libera a Portinhola.', branch: 'build', x: 4, y: 2, parents: ['damper'], cost: 300, requiresZone: 3, unlock: 'gate' },
-  { id: 'sensor', name: 'Sensor', desc: 'Libera o Sensor (portinholas inteligentes).', branch: 'build', x: 5, y: 2, parents: ['gate'], cost: 1500, requiresZone: 6, unlock: 'sensor' },
+  { id: 'ramp', name: 'Trilho curvo', desc: 'Libera o Trilho curvo.', branch: 'build', x: 1, y: 0, parents: ['core'], cost: 15, unlock: 'ramp' },
+  { id: 'funnel', name: 'Coletor', desc: 'Libera o Coletor.', branch: 'build', x: 2, y: 0, parents: ['ramp'], cost: 30, unlock: 'funnel' },
+  { id: 'spring', name: 'Placa de pulso', desc: 'Libera a Placa de pulso, que impulsiona na direção da seta.', branch: 'build', x: 3, y: 0, parents: ['funnel'], cost: 50, unlock: 'spring' },
+  { id: 'spring2', name: 'Pulso reforçado', desc: 'Placas de pulso 20% mais fortes.', branch: 'build', x: 4, y: -1, parents: ['spring'], cost: 260, icon: 'up', apply: (m) => (m.springMul *= 1.2) },
+  { id: 'conveyor', name: 'Esteira magnética', desc: 'Libera a Esteira magnética.', branch: 'build', x: 2, y: 1, parents: ['ramp'], cost: 60, unlock: 'conveyor' },
+  { id: 'conveyor2', name: 'Esteira turbo', desc: 'Esteiras magnéticas 40% mais rápidas.', branch: 'build', x: 3, y: 1, parents: ['conveyor'], cost: 300, icon: 'right', apply: (m) => (m.conveyorMul *= 1.4) },
+  { id: 'booster', name: 'Acelerador linear', desc: 'Libera o Acelerador linear.', branch: 'build', x: 4, y: 0, parents: ['spring'], cost: 150, requiresZone: 2, unlock: 'booster' },
+  { id: 'launcher', name: 'Canhão de massa', desc: 'Libera o Canhão de massa (longo alcance, move pedras densas).', branch: 'build', x: 5, y: 0, parents: ['booster'], cost: 220, requiresZone: 2, unlock: 'launcher' },
+  { id: 'launcher2', name: 'Recarga rápida', desc: 'Canhões de massa recarregam 40% mais rápido.', branch: 'build', x: 6, y: 0, parents: ['launcher'], cost: 900, icon: 'up', apply: (m) => (m.launcherCadenceMul *= 0.6) },
+  { id: 'arm', name: 'Braço robótico', desc: 'Libera o Braço robótico (lança em lotes).', branch: 'build', x: 5, y: 1, parents: ['launcher'], cost: 1200, requiresZone: 5, unlock: 'arm' },
+  { id: 'damper', name: 'Amortecedor inercial', desc: 'Libera o Amortecedor inercial.', branch: 'build', x: 3, y: 2, parents: ['conveyor'], cost: 120, requiresZone: 2, unlock: 'damper' },
+  { id: 'gate', name: 'Comporta', desc: 'Libera a Comporta.', branch: 'build', x: 4, y: 2, parents: ['damper'], cost: 300, requiresZone: 3, unlock: 'gate' },
+  { id: 'sensor', name: 'Sensor de passagem', desc: 'Libera o Sensor (comportas inteligentes).', branch: 'build', x: 5, y: 2, parents: ['gate'], cost: 1500, requiresZone: 6, unlock: 'sensor' },
 
   // --- Campos (para baixo)
-  { id: 'fan', name: 'Ventilador', desc: 'Libera o Ventilador.', branch: 'fields', x: 0, y: 1, parents: ['core'], cost: 350, requiresZone: 3, unlock: 'fan' },
-  { id: 'attractor', name: 'Ímã gravitacional', desc: 'Libera o Ímã gravitacional.', branch: 'fields', x: 0, y: 2, parents: ['fan'], cost: 700, requiresZone: 4, unlock: 'attractor' },
+  { id: 'fan', name: 'Soprador iônico', desc: 'Libera o Soprador iônico.', branch: 'fields', x: 0, y: 1, parents: ['core'], cost: 350, requiresZone: 3, unlock: 'fan' },
+  { id: 'attractor', name: 'Poço gravitacional', desc: 'Libera o Poço gravitacional.', branch: 'fields', x: 0, y: 2, parents: ['fan'], cost: 700, requiresZone: 4, unlock: 'attractor' },
   { id: 'repulsor', name: 'Repulsor', desc: 'Libera o Repulsor.', branch: 'fields', x: 1, y: 3, parents: ['attractor'], cost: 650, requiresZone: 4, unlock: 'repulsor' },
-  { id: 'fields2', name: 'Bobinas largas', desc: 'Campos e ventiladores alcançam 25% mais longe.', branch: 'fields', x: 0, y: 3, parents: ['attractor'], cost: 1200, icon: 'ring', apply: (m) => (m.fieldRadiusMul *= 1.25) },
-  { id: 'lift', name: 'Elevador de campo', desc: 'Libera o Elevador de campo.', branch: 'fields', x: 0, y: 4, parents: ['fields2'], cost: 1600, requiresZone: 5, unlock: 'lift' },
+  { id: 'fields2', name: 'Bobinas largas', desc: 'Campos e sopradores alcançam 25% mais longe.', branch: 'fields', x: 0, y: 3, parents: ['attractor'], cost: 1200, icon: 'ring', apply: (m) => (m.fieldRadiusMul *= 1.25) },
+  { id: 'lift', name: 'Elevador gravitacional', desc: 'Libera o Elevador gravitacional.', branch: 'fields', x: 0, y: 4, parents: ['fields2'], cost: 1600, requiresZone: 5, unlock: 'lift' },
 
   // --- Calor (para a esquerda)
   { id: 'heat1', name: 'Fornalha estelar I', desc: 'O calor máximo multiplica até ×4.', branch: 'heat', x: -1, y: 0, parents: ['core'], cost: 80, icon: 'flame', apply: (m) => (m.heatMaxMult = Math.max(m.heatMaxMult, 4)) },

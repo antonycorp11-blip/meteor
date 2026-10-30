@@ -257,14 +257,14 @@
   }
  ],
  "hints": [
-  "Um funil sob a queda alinha as pedras num ponto só.",
-  "A mola arremessa na direção da seta: gire até a linha pontilhada encostar no buraco negro.",
+  "Um coletor sob a queda alinha as pedras num ponto só.",
+  "A placa de pulso arremessa na direção da seta: gire até a linha pontilhada encostar no buraco negro.",
   "Com a mineração automática, o asteroide trabalha sozinho."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Canal de placas sobre o fosso até a encosta",
+   "label": "Canal de vigas sobre o fosso até a encosta",
    "devices": [
     {
      "type": "plank",
@@ -295,7 +295,7 @@
   },
   {
    "id": "C",
-   "label": "Funil no fosso e mola arremessando direto para o buraco negro",
+   "label": "Coletor no fosso e placa de pulso arremessando direto para o buraco negro",
    "devices": [
     {
      "type": "funnel",

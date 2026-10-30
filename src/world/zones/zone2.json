@@ -277,14 +277,14 @@
   }
  ],
  "hints": [
-  "O lançador não trava o fragmento: ele só dá o impulso.",
-  "Uma placa receptora depois do arco evita que o fragmento quique de volta.",
+  "O canhão de massa segura a pedra um instante e dispara com a mesma velocidade para qualquer massa.",
+  "Uma viga receptora depois do arco evita que o fragmento quique de volta.",
   "Propulsores em sequência vencem um desnível aos poucos."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Catapulta na borda com anteparo e placa receptora na câmara",
+   "label": "Catapulta na borda com anteparo e viga receptora na câmara",
    "aim": {
     "x": 260,
     "y": 340
@@ -316,7 +316,7 @@
   },
   {
    "id": "B",
-   "label": "Ponte de placas, acelerador e lançador na plataforma",
+   "label": "Ponte de vigas, acelerador e canhão de massa na plataforma",
    "aim": {
     "x": 260,
     "y": 340

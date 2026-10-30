@@ -2,9 +2,9 @@
  "id": 4,
  "key": "ions",
  "name": "Maré de Íons",
- "subtitle": "Duas rotas ao redor de um arco rochoso",
+ "subtitle": "Ruínas de uma megaestrutura antiga e vento iônico",
  "theme": "ion",
- "intro": "Campos regionais e massas diferentes. Separe, curve e entregue.",
+ "intro": "Ruínas antigas e vento iônico. Separe o leve do pesado.",
  "width": 1360,
  "height": 760,
  "gravity": {
@@ -69,14 +69,14 @@
   [
    [
     300,
-    690
+    640
    ],
    [
-    1000,
-    735
+    520,
+    640
    ],
    [
-    1000,
+    520,
     760
    ],
    [
@@ -86,110 +86,146 @@
   ],
   [
    [
+    520,
+    370
+   ],
+   [
+    760,
+    400
+   ],
+   [
+    760,
+    760
+   ],
+   [
+    520,
+    760
+   ]
+  ],
+  [
+   [
     440,
-    230
+    0
    ],
    [
-    920,
-    275
+    1000,
+    0
    ],
    [
-    920,
-    540
+    1000,
+    170
    ],
    [
     440,
-    540
+    170
    ]
   ],
   [
    [
-    380,
-    0
+    760,
+    450
    ],
    [
-    1000,
-    0
+    980,
+    494
    ],
    [
-    1000,
-    105
-   ],
-   [
-    380,
-    105
-   ]
-  ],
-  [
-   [
-    1000,
-    0
-   ],
-   [
-    1060,
-    0
-   ],
-   [
-    1060,
-    520
-   ],
-   [
-    1000,
-    520
-   ]
-  ],
-  [
-   [
-    1000,
-    736
-   ],
-   [
-    1180,
-    750
-   ],
-   [
-    1180,
+    980,
     760
    ],
    [
-    1000,
+    760,
     760
    ]
   ],
   [
    [
-    1180,
-    750
+    980,
+    560
    ],
    [
-    1360,
-    750
+    1032,
+    591
    ],
    [
-    1360,
+    1032,
     760
    ],
    [
-    1180,
+    980,
     760
    ]
   ],
   [
+   [
+    1032,
+    620
+   ],
+   [
+    1080,
+    620
+   ],
+   [
+    1080,
+    760
+   ],
+   [
+    1032,
+    760
+   ]
+  ],
+  [
+   [
+    1080,
+    355
+   ],
+   [
+    1110,
+    355
+   ],
+   [
+    1110,
+    760
+   ],
+   [
+    1080,
+    760
+   ]
+  ],
+  [
+   [
+    1110,
+    450
+   ],
+   [
+    1215,
+    466
+   ],
+   [
+    1215,
+    760
+   ],
+   [
+    1110,
+    760
+   ]
+  ],
+  [
+   [
+    1215,
+    466
+   ],
    [
     1320,
-    380
-   ],
-   [
-    1360,
-    380
-   ],
-   [
-    1360,
-    750
+    446
    ],
    [
     1320,
-    750
+    760
+   ],
+   [
+    1215,
+    760
    ]
   ],
   [
@@ -208,6 +244,24 @@
    [
     1060,
     120
+   ]
+  ],
+  [
+   [
+    1320,
+    120
+   ],
+   [
+    1360,
+    120
+   ],
+   [
+    1360,
+    760
+   ],
+   [
+    1320,
+    760
    ]
   ]
  ],
@@ -217,8 +271,8 @@
   "r": 40
  },
  "blackHole": {
-  "x": 1220,
-  "y": 700,
+  "x": 1215,
+  "y": 398,
   "attractRadius": 95,
   "absorbRadius": 15,
   "strength": 1000
@@ -228,32 +282,15 @@
   {
    "id": "vento",
    "label": "Vento iônico",
-   "x": 920,
-   "y": 280,
-   "w": 80,
+   "x": 980,
+   "y": 170,
+   "w": 100,
    "h": 360,
-   "ax": -200,
+   "ax": 360,
    "ay": 0
   }
  ],
- "regions": [
-  {
-   "id": "superior",
-   "label": "Corredor superior",
-   "x": 500,
-   "y": 105,
-   "w": 360,
-   "h": 160
-  },
-  {
-   "id": "inferior",
-   "label": "Corredor inferior",
-   "x": 500,
-   "y": 540,
-   "w": 360,
-   "h": 190
-  }
- ],
+ "regions": [],
  "tools": [
   "attractor",
   "repulsor"
@@ -283,7 +320,7 @@
   {
    "id": "z4-basic",
    "tier": "basic",
-   "title": "Alimente o buraco negro com 600 de massa",
+   "title": "Entregue 600 de massa",
    "reqs": [
     {
      "kind": "mass",
@@ -295,15 +332,11 @@
   {
    "id": "z4-eng",
    "tier": "engineering",
-   "title": "60% de eficiência, 35 entregas automáticas e 20 densos absorvidos",
+   "title": "55% de eficiência e 20 pedras densas absorvidas",
    "reqs": [
     {
      "kind": "efficiency",
-     "pct": 60
-    },
-    {
-     "kind": "autoDeliveries",
-     "count": 35
+     "pct": 55
     },
     {
      "kind": "denseDelivered",
@@ -315,15 +348,11 @@
   {
    "id": "z4-x1",
    "tier": "extra",
-   "title": "Use as duas rotas na mesma instalação (10 + 10)",
+   "title": "Entrega por canhão a 350 px ou mais",
    "reqs": [
     {
-     "kind": "bothRoutes",
-     "count": 10,
-     "regions": [
-      "superior",
-      "inferior"
-     ]
+     "kind": "launchDistance",
+     "dist": 350
     }
    ],
    "reward": 240
@@ -331,7 +360,7 @@
   {
    "id": "z4-x2",
    "tier": "extra",
-   "title": "10 entregas com curva gravitacional, sem lançador",
+   "title": "10 entregas curvadas por campo gravitacional",
    "reqs": [
     {
      "kind": "fieldCurve",
@@ -342,89 +371,50 @@
   }
  ],
  "hints": [
-  "O vento iônico empurra mais os leves que os densos.",
-  "Campos não atravessam rocha: posicione-os com linha de visão.",
-  "Metálicos sentem os campos com muito mais força."
+  "Pedras densas e metálicas mal sobem com a placa de pulso: use o canhão de massa.",
+  "Arremesse em etapas: primeiro sobre a muralha antiga, depois do bolso para a câmara.",
+  "O vento iônico sopra para a câmara e carrega mais as pedras leves."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Rota inferior: rampa longa de placas sob o arco e campo atrator curvando para o buraco negro",
+   "label": "Canhão de massa sob a borda do platô e outro no bolso junto ao parapeito",
    "aim": {
     "x": 230,
     "y": 140
    },
-   "pace": 60,
-   "expectRate": 0.5,
+   "pace": 80,
+   "expectRate": 0.45,
    "devices": [
     {
-     "type": "plank",
-     "x": 333.3,
-     "y": 572.8,
-     "angle": 0.215
+     "type": "funnel",
+     "x": 378,
+     "y": 355.4,
+     "angle": -0.2
     },
     {
-     "type": "plank",
-     "x": 397.7,
-     "y": 586.9,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 462.2,
-     "y": 601,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 526.7,
-     "y": 615.1,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 591.2,
-     "y": 629.2,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 655.6,
-     "y": 643.3,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 720.1,
-     "y": 657.4,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 784.6,
-     "y": 671.5,
-     "angle": 0.215
-    },
-    {
-     "type": "plank",
-     "x": 849.1,
-     "y": 685.6,
-     "angle": 0.215
-    },
-    {
-     "type": "attractor",
-     "x": 1102.5,
-     "y": 691.8,
-     "angle": 0,
+     "type": "launcher",
+     "x": 396.8,
+     "y": 396.7,
+     "angle": 0.265,
      "params": {
-      "strength": 0.4
+      "power": 10.9
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 1059,
+     "y": 609,
+     "angle": 0.002,
+     "params": {
+      "power": 14
      }
     }
    ]
   },
   {
    "id": "B",
-   "label": "Rota superior: lançador com anteparo, topo do arco, queda pelo vento e rampa curva",
+   "label": "Placas de pulso: só as pedras leves sobem, e o vento iônico as leva para a câmara",
    "aim": {
     "x": 230,
     "y": 140
@@ -433,42 +423,30 @@
    "expectRate": 0.2,
    "devices": [
     {
-     "type": "launcher",
-     "x": 366.1,
-     "y": 359.7,
-     "angle": 0.381,
+     "type": "funnel",
+     "x": 380.4,
+     "y": 391.3,
+     "angle": -0.137
+    },
+    {
+     "type": "spring",
+     "x": 356.3,
+     "y": 455.6,
+     "angle": 0.73,
      "params": {
-      "power": 11.87
+      "power": 9.04
      }
     },
     {
-     "type": "plank",
-     "x": 361.5,
-     "y": 280.9,
-     "angle": 1.662
-    },
-    {
-     "type": "ramp",
-     "x": 948.5,
-     "y": 680,
-     "angle": 0.149
-    },
-    {
-     "type": "attractor",
-     "x": 1083.6,
-     "y": 637.3,
-     "angle": 0,
+     "type": "spring",
+     "x": 1054,
+     "y": 615,
+     "angle": -0.06,
      "params": {
-      "strength": 0.86
+      "power": 10
      }
     }
    ]
-  },
-  {
-   "id": "C",
-   "label": "Separar densos (rota inferior) e leves (rota superior) na mesma instalação",
-   "manual": true,
-   "devices": []
   }
  ],
  "growthTarget": 7000

@@ -797,8 +797,8 @@ export class Renderer {
     const c = Math.cos(d.angle);
     const sn = Math.sin(d.angle);
     ctx.globalAlpha = alpha;
-    // mola comprimida por um instante ao arremessar
-    const squash = d.type === 'spring' ? 1 - d.rt.flash * 0.25 : 1;
+    // placa de pulso recua um instante ao disparar
+    const squash = d.type === 'spring' ? 1 - d.rt.flash * 0.15 : 1;
     ctx.setTransform(z * c, z * sn, -z * sn * squash, z * c * squash, tx + z * d.x, ty + z * d.y);
     ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
     if (art.moving && d.pivotWorld) {
@@ -832,12 +832,12 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  /** Arco pontilhado de onde a mola/lançador vão mandar as pedras. */
+  /** Arco pontilhado de onde a placa de pulso/canhão vão mandar as pedras. */
   private drawDevicePreview(d: { type: DeviceType; x: number; y: number; angle: number; params: Record<string, number> }, s: RenderState) {
     if (d.type !== 'spring' && d.type !== 'launcher') return;
     const mods = s.sim.mods;
     const n = { x: Math.sin(d.angle), y: -Math.cos(d.angle) };
-    const power = d.type === 'spring' ? (d.params.power ?? 8) * mods.springMul : d.params.power ?? 9;
+    const power = d.type === 'spring' ? (d.params.power ?? 7) * mods.springMul : d.params.power ?? 11;
     let x = d.x + n.x * 8;
     let y = d.y + n.y * 8;
     let vx = n.x * power;

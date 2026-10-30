@@ -399,7 +399,18 @@ export class Sim {
     return { ok: true };
   }
 
+  /** Mantém parâmetros dentro dos limites do catálogo. */
+  private clampParams(type: DeviceType, params: Record<string, number>) {
+    const out = { ...params };
+    for (const p of DEVICES[type].params) {
+      const v = out[p.key];
+      if (typeof v === 'number') out[p.key] = Math.min(p.max, Math.max(p.min, v));
+    }
+    return out;
+  }
+
   addDevice(save: Omit<DeviceSave, 'id'> & { id?: number }): Device {
+    save = { ...save, params: this.clampParams(save.type, save.params) };
     const id = save.id ?? this.nextDeviceId;
     this.nextDeviceId = Math.max(this.nextDeviceId, id + 1);
     const dev: Device = {
@@ -473,7 +484,7 @@ export class Sim {
   }
 
   setDeviceParams(dev: Device, params: Record<string, number>) {
-    dev.params = { ...dev.params, ...params };
+    dev.params = this.clampParams(dev.type, { ...dev.params, ...params });
   }
 
   private nudgeFragmentsOut(polys: Poly[]) {
@@ -577,7 +588,8 @@ export class Sim {
           const vel = Body.getVelocity(frag.body);
           const tx = { x: -n.y, y: n.x };
           const vt = vel.x * tx.x + vel.y * tx.y;
-          const power = (dev.params.power ?? 8) * this.mods.springMul;
+          // pedras pesadas sobem menos: o pulso entrega impulso, não velocidade
+          const power = ((dev.params.power ?? 7) * this.mods.springMul) / Math.sqrt(Math.max(0.5, frag.body.mass));
           Body.setVelocity(frag.body, { x: n.x * power + tx.x * vt * 0.35, y: n.y * power + tx.y * vt * 0.35 });
           Body.setAngularVelocity(frag.body, (this.rng.next() - 0.5) * 0.25);
           dev.rt.flash = 1;
@@ -950,7 +962,7 @@ export class Sim {
     // erro de mira determinístico, pequeno
     const err = (this.rng.next() - 0.5) * 0.045;
     const a = dev.angle - Math.PI / 2 + err;
-    const power = (dev.params.power ?? 8) * this.rng.range(0.985, 1.015);
+    const power = (dev.params.power ?? 10) * this.rng.range(0.985, 1.015);
     Sleeping.set(best.body, false);
     Body.setPosition(best.body, {
       x: best.body.position.x + Math.cos(dev.angle - Math.PI / 2) * 1.5,

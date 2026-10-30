@@ -631,17 +631,22 @@ export function deviceArt(type: DeviceType): DeviceArt {
       break;
     }
     case 'spring': {
-      // plataforma sobre molas (mesma altura do corpo físico: y −4..4)
+      // placa de pulso: base blindada com emissores e lâmina de luz dura no topo (y −4..4)
       const mk = (lit: boolean) => {
         const g = gridFor(solids);
-        g.rect(-21, 1, 42, 3, METAL[1]);
-        g.line(-21, 1, 20, 1, METAL[3]);
-        for (const cx of [-13, -4, 5, 14]) {
-          g.line(cx - 2, 0, cx + 2, -1, METAL[4]);
-          g.line(cx - 2, -1, cx + 2, 0, METAL[2]);
+        g.rect(-21, 0, 42, 4, METAL[1]);
+        g.line(-21, 0, 20, 0, METAL[3]);
+        g.line(-21, 3, 20, 3, METAL[0]);
+        for (const cx of [-15, -5, 5, 15]) {
+          g.rect(cx - 2, 1, 4, 2, lit ? '#ffffff' : '#1f9ab0');
+          g.set(g.ox + cx - 1, g.oy + 1, lit ? '#ffffff' : PAL.cyan);
         }
-        g.rect(-21, -4, 42, 2, lit ? '#e8ffff' : PAL.cyan);
-        g.line(-21, -4, 20, -4, lit ? '#ffffff' : '#bff6ff');
+        g.set(g.ox - 21, g.oy + 1, PAL.core);
+        g.set(g.ox + 20, g.oy + 1, PAL.core);
+        // lâmina de luz dura, separada da base por uma fresta
+        g.rect(-20, -4, 40, 2, lit ? '#e8ffff' : PAL.cyan);
+        g.line(-19, -4, 18, -4, lit ? '#ffffff' : '#bff6ff');
+        for (const cx of [-10, 0, 10]) g.set(g.ox + cx, g.oy - 3, lit ? '#ffffff' : '#1f9ab0');
         return finish(g);
       };
       art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: -3, color: PAL.cyan, size: 22 }] };

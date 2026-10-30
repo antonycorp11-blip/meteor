@@ -392,14 +392,14 @@
   }
  ],
  "hints": [
-  "O elevador levita, mas não prende: alguém precisa empurrar no topo.",
+  "O elevador gravitacional levita, mas não prende: alguém precisa empurrar no topo.",
   "Pense em cadeias: cada barreira pede uma resposta diferente.",
   "Um autoextrator só ajuda se o transporte já funciona."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Lançador no desfiladeiro (ritmo calmo), descida pelo platô e rampa curva antes da câmara",
+   "label": "Canhão de massa no desfiladeiro (ritmo calmo), descida pelo platô e trilho curvo antes da câmara",
    "aim": {
     "x": 240,
     "y": 160
@@ -426,7 +426,7 @@
   },
   {
    "id": "B",
-   "label": "Elevador de campo no desfiladeiro, ventilador empurrando no topo e rampa curva",
+   "label": "Elevador de campo no desfiladeiro, soprador iônico empurrando no topo e trilho curvo",
    "aim": {
     "x": 240,
     "y": 160
@@ -462,7 +462,7 @@
   },
   {
    "id": "C",
-   "label": "Rotas paralelas (lançador + elevador) com braço basculante e autoextrator para volume",
+   "label": "Rotas paralelas (canhão + elevador) com braço basculante e autoextrator para volume",
    "manual": true,
    "devices": []
   }

@@ -339,14 +339,14 @@
   }
  ],
  "hints": [
-  "Uma esteira aberta empurra, mas não prende: pedras podem saltar.",
-  "Uma portinhola alterna duas rotas e evita congestionamento.",
-  "Ventiladores perdem força em fragmentos densos."
+  "Uma esteira magnética empurra, mas não prende: pedras podem saltar.",
+  "Uma comporta alterna duas rotas e evita congestionamento.",
+  "Sopradores iônicos perdem força em fragmentos densos."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Percurso superior de placas sobre o poço, queda até o bolsão e lançador sobre o paredão em S",
+   "label": "Percurso superior de vigas sobre o poço, queda até o bolsão e canhão de massa sobre o paredão em S",
    "aim": {
     "x": 230,
     "y": 140
@@ -409,7 +409,7 @@
   },
   {
    "id": "B",
-   "label": "Percurso inferior: esteiras abertas tiram os detritos do poço até o lançador",
+   "label": "Percurso inferior: esteiras abertas tiram os detritos do poço até o canhão de massa",
    "aim": {
     "x": 230,
     "y": 140
@@ -481,7 +481,7 @@
   },
   {
    "id": "C",
-   "label": "Alternar as duas rotas com uma portinhola para evitar congestionamento no bolsão",
+   "label": "Alternar as duas rotas com uma comporta para evitar congestionamento no bolsão",
    "manual": true,
    "devices": []
   }

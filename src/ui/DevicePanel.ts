@@ -25,7 +25,7 @@ export class DevicePanel {
       h('button', { class: `px-btn icon ${label ? 'labeled' : ''}`, title, 'aria-label': title, onclick: (e: Event) => fn(e as MouseEvent) }, icon(ic, 16), label ? h('span', { class: 'lbl' }, label) : null);
     this.sellBtn = h('button', { class: 'px-btn red', onclick: () => api.sellSelected(), title: 'Revender (Delete)' }, icon('trash', 14), ' Vender');
     this.powerBtn = b('power', 'Ligar/desligar', () => api.toggleEnabled());
-    this.gateBtn = h('button', { class: 'px-btn', onclick: () => api.toggleGate(), title: 'Abrir/fechar portinhola' }, icon('gate', 14), ' Alternar');
+    this.gateBtn = h('button', { class: 'px-btn', onclick: () => api.toggleGate(), title: 'Abrir/fechar comporta' }, icon('gate', 14), ' Alternar');
     this.root = h(
       'div',
       { class: 'device-panel px-panel' },

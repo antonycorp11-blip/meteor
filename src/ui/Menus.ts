@@ -218,7 +218,7 @@ export class Menus {
             h('li', {}, 'Segure e arraste uma pedra: feixe de força limitada.'),
             h('li', {}, 'Arraste o fundo: move a câmera · roda/pinça: zoom.'),
             h('li', {}, 'Peças: escolha na barra à esquerda, posicione, gire (Q/E, roda ou alça amarela) e clique.'),
-            h('li', {}, 'A linha pontilhada mostra para onde molas e lançadores mandam as pedras.'),
+            h('li', {}, 'A linha pontilhada mostra para onde placas de pulso e canhões mandam as pedras.'),
             h('li', {}, 'Espaço pausa · Delete revende · Ctrl+Z desfaz · T árvore · F visão geral.'),
           ),
           h('h3', {}, 'Pedras'),

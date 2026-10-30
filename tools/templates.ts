@@ -70,32 +70,6 @@ TEMPLATES.z3B = {
     { type: 'plank', x: [1090, 1200], y: [500, 560], angle: [-0.6, 0.6] },
   ],
 };
-TEMPLATES.z4A = {
-  aim: { x: 230, y: 140 },
-  pace: 60,
-  devices: [
-    { type: 'plank', x: 333.3, y: 572.8, angle: 0.215 },
-    { type: 'plank', x: 397.7, y: 586.9, angle: 0.215 },
-    { type: 'plank', x: 462.2, y: 601.0, angle: 0.215 },
-    { type: 'plank', x: 526.7, y: 615.1, angle: 0.215 },
-    { type: 'plank', x: 591.2, y: 629.2, angle: 0.215 },
-    { type: 'plank', x: 655.6, y: 643.3, angle: 0.215 },
-    { type: 'plank', x: 720.1, y: 657.4, angle: 0.215 },
-    { type: 'plank', x: 784.6, y: 671.5, angle: 0.215 },
-    { type: 'plank', x: 849.1, y: 685.6, angle: 0.215 },
-    { type: 'attractor', x: [1080, 1200], y: [560, 700], angle: 0, params: { strength: [0.3, 1] } },
-  ],
-};
-TEMPLATES.z4B = {
-  aim: { x: 230, y: 140 },
-  pace: 60,
-  devices: [
-    { type: 'launcher', x: [355, 380], y: [345, 370], angle: [0.2, 0.4], params: { power: [10, 12] } },
-    { type: 'plank', x: [355, 375], y: [275, 300], angle: [1.5, 1.8] },
-    { type: 'ramp', x: [930, 990], y: [680, 715], angle: [-0.4, 0.4] },
-    { type: 'attractor', x: [1080, 1200], y: [560, 700], angle: 0, params: { strength: [0.3, 1] } },
-  ],
-};
 TEMPLATES.z5A = {
   aim: { x: 240, y: 160 },
   pace: 60,
@@ -111,5 +85,31 @@ TEMPLATES.z5B = {
     { type: 'lift', x: [350, 375], y: [549, 554], angle: [-0.1, 0.1], params: { strength: [0.7, 1] } },
     { type: 'fan', x: [334, 345], y: [280, 330], angle: [-0.3, 0.2], params: { strength: [0.5, 1] } },
     { type: 'ramp', x: [1010, 1080], y: [600, 650], angle: [-0.5, 0.5] },
+  ],
+};
+TEMPLATES.z4easy = {
+  aim: { x: 230, y: 140 },
+  pace: 60,
+  devices: [
+    { type: 'spring', x: [330, 500], y: [625, 632], angle: [0.1, 0.8], params: { power: [8, 10] } },
+    { type: 'spring', x: [1054, 1058], y: [615, 615], angle: [-0.1, 0.05], params: { power: [10, 10] } },
+  ],
+};
+TEMPLATES.z4A = {
+  aim: { x: 230, y: 140 },
+  pace: 60,
+  devices: [
+    { type: 'funnel', x: [320, 400], y: [330, 420], angle: [-0.2, 0.2] },
+    { type: 'spring', x: [320, 420], y: [360, 470], angle: [0.2, 0.9], params: { power: [7, 10] } },
+    { type: 'spring', x: [1054, 1058], y: [615, 615], angle: [-0.1, 0.05], params: { power: [10, 10] } },
+  ],
+};
+TEMPLATES.z4B = {
+  aim: { x: 230, y: 140 },
+  pace: 60,
+  devices: [
+    { type: 'funnel', x: [320, 400], y: [330, 400], angle: [-0.2, 0.2] },
+    { type: 'launcher', x: [320, 420], y: [380, 460], angle: [0.2, 0.9], params: { power: [8, 16] } },
+    { type: 'launcher', x: [1053, 1059], y: [609, 609], angle: [-0.1, 0.1], params: { power: [11, 14] } },
   ],
 };
