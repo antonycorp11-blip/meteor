@@ -8,7 +8,7 @@ import type { FragmentTypeId } from '../src/physics/fragmentTypes';
 const a = process.argv.slice(2).filter((x) => x !== '--');
 const zone = loadZone(Number(a[0]));
 const sim = new Sim(zone, { seed: 7 });
-for (const d of JSON.parse(process.env.DEVICES ?? '[]')) sim.addDevice({ ...d, params: { ...defaultParams(d.type), ...(d.params ?? {}) }, enabled: true, paid: 0 });
+for (const d of JSON.parse(process.env.DEVICES ?? '[]')) if (!sim.validatePlacement(d.type, d.x, d.y, d.angle, { ...defaultParams(d.type), ...(d.params ?? {}) }).ok) console.error('INVALID', d.type, d.x, d.y); else sim.addDevice({ ...d, params: { ...defaultParams(d.type), ...(d.params ?? {}) }, enabled: true, paid: 0 });
 let del = 0;
 sim.events.on('absorb', () => del++);
 const n = Number(a[3] ?? 10);

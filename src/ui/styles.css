@@ -1547,3 +1547,59 @@ body.compact .hud-cam .px-btn:nth-child(n + 4) {
   font-size: 0.85em;
   padding: 0 6px;
 }
+
+/* níveis na árvore estelar */
+.tree-node .n-level {
+  position: absolute;
+  bottom: 2px;
+  right: -14px;
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 10px;
+  padding: 1px 4px;
+  background: #0a0618;
+  color: var(--muted);
+  box-shadow: 0 0 0 2px #05030c;
+}
+.tree-node .n-level.on {
+  color: var(--branch, var(--core));
+}
+.td-levels {
+  margin: 6px 0 8px;
+}
+.td-lv {
+  font-family: var(--num);
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.td-lv span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.td-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 5px 0;
+}
+.td-pips i {
+  width: 8px;
+  height: 8px;
+  background: #1a1430;
+  box-shadow: 0 0 0 1px #05030c;
+}
+.td-pips i.on {
+  background: var(--amber);
+}
+.td-pips i.capped {
+  background: #0a0818;
+  opacity: 0.5;
+}
+.td-effect {
+  margin: 2px 0;
+  font-size: 0.85em;
+  color: var(--core);
+}
+.td-effect.next {
+  color: var(--cyan);
+}

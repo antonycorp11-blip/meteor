@@ -113,3 +113,21 @@ TEMPLATES.z4B = {
     { type: 'launcher', x: [1053, 1059], y: [609, 609], angle: [-0.1, 0.1], params: { power: [11, 14] } },
   ],
 };
+TEMPLATES.z5A = {
+  aim: { x: 250, y: 200 },
+  pace: 90,
+  devices: [
+    { type: 'launcher', x: [345, 415], y: [549, 549], angle: [0.0, 0.2], params: { power: [11, 16] } },
+    { type: 'launcher', x: [819, 827], y: [629, 629], angle: [-0.05, 0.2], params: { power: [11, 16] } },
+    { type: 'launcher', x: [1199, 1207], y: [689, 689], angle: [0.0, 0.35], params: { power: [9, 16] } },
+  ],
+};
+TEMPLATES.z5B = {
+  aim: { x: 250, y: 200 },
+  pace: 70,
+  devices: [
+    { type: 'launcher', x: [345, 415], y: [549, 549], angle: [0.0, 0.2], params: { power: [11, 16] } },
+    { type: 'launcher', x: [819, 827], y: [629, 629], angle: [-0.05, 0.2], params: { power: [11, 16] } },
+    { type: 'spring', x: [1201, 1205], y: [696, 696], angle: [0.0, 0.4], params: { power: [8, 10] } },
+  ],
+};

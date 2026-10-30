@@ -47,6 +47,7 @@ export interface HudData {
   ghostReason: string;
   ghostPrice: number;
   autoMine: number;
+  drones: number;
 }
 
 export interface SelectedInfo {

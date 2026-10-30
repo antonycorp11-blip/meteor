@@ -207,10 +207,11 @@ export class Sim {
   private pickType(): FragmentTypeId {
     const table = this.zone.fragmentTable;
     let total = 0;
-    for (const t of table) total += t.weight;
+    const w = (t: { type: FragmentTypeId; weight: number }) => (FRAGMENT_TYPES[t.type].value >= 1.5 ? t.weight * this.mods.valuableWeightMul : t.weight);
+    for (const t of table) total += w(t);
     let r = this.rng.next() * total;
     for (const t of table) {
-      r -= t.weight;
+      r -= w(t);
       if (r <= 0) return t.type;
     }
     return table[0].type;
@@ -283,7 +284,8 @@ export class Sim {
     const a = this.zone.asteroid;
     const base = target ? Math.atan2(target.y - a.y, target.x - a.x) : -Math.PI / 2 + this.rng.range(-0.6, 0.6);
     const out: Fragment[] = [];
-    const count = this.rng.chance(this.mods.multiExtractChance) ? 2 : 1;
+    const ch = this.mods.multiExtractChance;
+    const count = 1 + Math.floor(ch) + (this.rng.chance(ch - Math.floor(ch)) ? 1 : 0);
     for (let k = 0; k < count; k++) {
       let ang = base + k * 0.32;
       let found = false;
@@ -589,7 +591,7 @@ export class Sim {
           const tx = { x: -n.y, y: n.x };
           const vt = vel.x * tx.x + vel.y * tx.y;
           // pedras pesadas sobem menos: o pulso entrega impulso, não velocidade
-          const power = ((dev.params.power ?? 7) * this.mods.springMul) / Math.sqrt(Math.max(0.5, frag.body.mass));
+          const power = ((dev.params.power ?? 7) * this.mods.springMul) / Math.pow(Math.max(0.5, frag.body.mass), this.mods.springMassExp);
           Body.setVelocity(frag.body, { x: n.x * power + tx.x * vt * 0.35, y: n.y * power + tx.y * vt * 0.35 });
           Body.setAngularVelocity(frag.body, (this.rng.next() - 0.5) * 0.25);
           dev.rt.flash = 1;
@@ -921,6 +923,13 @@ export class Sim {
     if (this.autoMineTimer >= iv) {
       this.autoMineTimer = 0;
       this.extract(this.mineAim, true);
+      // drones extras disparam em ângulos vizinhos
+      const a = this.zone.asteroid;
+      const base = this.mineAim ? Math.atan2(this.mineAim.y - a.y, this.mineAim.x - a.x) : -Math.PI / 2;
+      for (let k = 1; k <= this.mods.extraDrones; k++) {
+        const ang = base + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.45;
+        this.extract({ x: a.x + Math.cos(ang) * 100, y: a.y + Math.sin(ang) * 100 }, true);
+      }
     }
   }
 
@@ -960,7 +969,7 @@ export class Sim {
     dev.rt.holdTime += dt;
     if (dev.rt.holdTime < 0.1 || this.time < dev.rt.nextReady) return;
     // erro de mira determinístico, pequeno
-    const err = (this.rng.next() - 0.5) * 0.045;
+    const err = (this.rng.next() - 0.5) * 0.045 * this.mods.launcherErrMul;
     const a = dev.angle - Math.PI / 2 + err;
     const power = (dev.params.power ?? 10) * this.rng.range(0.985, 1.015);
     Sleeping.set(best.body, false);
@@ -1092,7 +1101,7 @@ export class Sim {
     const launchDistance = f.launchedFrom ? Math.abs(p.x - f.launchedFrom.x) : 0;
     this.events.emit('absorb', {
       frag: f,
-      value: def.value * this.mods.fragmentValueMul,
+      value: def.value * this.mods.fragmentValueMul * (this.mods.typeValueMul[f.type] ?? 1),
       mass: def.mass,
       auto: !f.manual,
       launchDistance,

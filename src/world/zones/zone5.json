@@ -2,9 +2,9 @@
  "id": 5,
  "key": "catedral",
  "name": "Catedral do Horizonte",
- "subtitle": "Três barreiras sucessivas",
+ "subtitle": "Três muralhas dos Construtores, cada uma com seu bolsão",
  "theme": "cathedral",
- "intro": "Três barreiras naturais. Componha seus sistemas.",
+ "intro": "Três muralhas antigas. Cada bolsão precisa do seu próprio arremesso.",
  "width": 1600,
  "height": 880,
  "gravity": {
@@ -55,7 +55,7 @@
    ],
    [
     320,
-    345
+    312
    ],
    [
     320,
@@ -69,14 +69,14 @@
   [
    [
     320,
-    560
+    580
    ],
    [
-    400,
-    560
+    520,
+    552
    ],
    [
-    400,
+    520,
     880
    ],
    [
@@ -86,182 +86,236 @@
   ],
   [
    [
-    400,
-    300
+    520,
+    345
    ],
    [
-    460,
-    300
+    560,
+    345
    ],
    [
-    460,
+    560,
     880
    ],
    [
-    400,
+    520,
     880
    ]
   ],
   [
    [
-    460,
+    560,
+    440
+   ],
+   [
+    780,
+    580
+   ],
+   [
+    780,
+    880
+   ],
+   [
+    560,
+    880
+   ]
+  ],
+  [
+   [
+    780,
+    665
+   ],
+   [
+    920,
+    640
+   ],
+   [
+    920,
+    880
+   ],
+   [
+    780,
+    880
+   ]
+  ],
+  [
+   [
+    920,
     430
    ],
    [
-    1000,
-    560
+    960,
+    430
    ],
    [
-    1000,
+    960,
     880
    ],
    [
-    460,
+    920,
     880
    ]
   ],
   [
    [
-    650,
-    0
+    960,
+    500
    ],
    [
-    950,
-    0
+    1180,
+    590
    ],
    [
-    950,
-    140
+    1180,
+    880
    ],
    [
-    650,
-    140
+    960,
+    880
    ]
   ],
   [
    [
-    760,
-    140
-   ],
-   [
-    840,
-    140
-   ],
-   [
-    840,
-    360
-   ],
-   [
-    760,
-    360
-   ]
-  ],
-  [
-   [
-    1000,
-    660
+    1180,
+    735
    ],
    [
     1300,
-    720
+    712
    ],
    [
     1300,
     880
    ],
    [
-    1000,
+    1180,
     880
    ]
   ],
   [
    [
-    1080,
-    0
-   ],
-   [
-    1140,
-    0
-   ],
-   [
-    1140,
-    600
-   ],
-   [
-    1080,
-    600
-   ]
-  ],
-  [
-   [
-    1140,
-    0
-   ],
-   [
-    1600,
-    0
-   ],
-   [
-    1600,
-    260
-   ],
-   [
-    1140,
-    260
-   ]
-  ],
-  [
-   [
     1300,
-    820
+    500
    ],
    [
-    1600,
-    820
+    1340,
+    500
    ],
    [
-    1600,
+    1340,
     880
    ],
    [
     1300,
+    880
+   ]
+  ],
+  [
+   [
+    1340,
+    800
+   ],
+   [
+    1450,
+    830
+   ],
+   [
+    1450,
+    880
+   ],
+   [
+    1340,
+    880
+   ]
+  ],
+  [
+   [
+    1450,
+    830
+   ],
+   [
+    1560,
+    800
+   ],
+   [
+    1560,
+    880
+   ],
+   [
+    1450,
     880
    ]
   ],
   [
    [
     1560,
-    260
+    0
    ],
    [
     1600,
-    260
+    0
    ],
    [
     1600,
-    820
+    880
    ],
    [
     1560,
-    820
+    880
    ]
   ],
   [
    [
-    1340,
-    260
+    640,
+    0
    ],
    [
-    1400,
-    260
+    700,
+    0
    ],
    [
-    1400,
-    640
+    700,
+    110
    ],
    [
-    1340,
-    640
+    640,
+    110
+   ]
+  ],
+  [
+   [
+    1060,
+    0
+   ],
+   [
+    1110,
+    0
+   ],
+   [
+    1110,
+    170
+   ],
+   [
+    1060,
+    170
+   ]
+  ],
+  [
+   [
+    1300,
+    0
+   ],
+   [
+    1560,
+    0
+   ],
+   [
+    1560,
+    230
+   ],
+   [
+    1300,
+    230
    ]
   ]
  ],
@@ -271,7 +325,7 @@
   "r": 44
  },
  "blackHole": {
-  "x": 1470,
+  "x": 1450,
   "y": 772,
   "attractRadius": 95,
   "absorbRadius": 15,
@@ -392,77 +446,92 @@
   }
  ],
  "hints": [
-  "O elevador gravitacional levita, mas não prende: alguém precisa empurrar no topo.",
-  "Pense em cadeias: cada barreira pede uma resposta diferente.",
-  "Um autoextrator só ajuda se o transporte já funciona."
+  "Cada muralha prende as pedras num bolsão: sem um arremesso em cada etapa, nada passa.",
+  "Pedras caem do platô no primeiro bolsão: o canhão no meio dele tem espaço para mirar por cima da muralha.",
+  "Na última muralha uma placa de pulso basta para as pedras leves; as pesadas precisam do canhão."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Canhão de massa no desfiladeiro (ritmo calmo), descida pelo platô e trilho curvo antes da câmara",
+   "label": "Três canhões de massa, um em cada bolsão entre as muralhas",
    "aim": {
-    "x": 240,
-    "y": 160
+    "x": 250,
+    "y": 200
    },
-   "pace": 100,
-   "expectRate": 0.2,
+   "pace": 90,
+   "expectRate": 0.1,
    "devices": [
     {
      "type": "launcher",
-     "x": 364.9,
-     "y": 546.6,
-     "angle": 0.088,
+     "x": 427.1,
+     "y": 550,
+     "angle": 0.128,
      "params": {
-      "power": 11.61
+      "power": 15.95
      }
     },
     {
-     "type": "ramp",
-     "x": 1066,
-     "y": 617.5,
-     "angle": 0.381
+     "type": "launcher",
+     "x": 838.2,
+     "y": 634.9,
+     "angle": 0.137,
+     "params": {
+      "power": 13.34
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 1269.6,
+     "y": 700,
+     "angle": 0.053,
+     "params": {
+      "power": 14.47
+     }
     }
    ]
   },
   {
    "id": "B",
-   "label": "Elevador de campo no desfiladeiro, soprador iônico empurrando no topo e trilho curvo",
+   "label": "Dois canhões e uma placa de pulso na última muralha (só as leves passam)",
    "aim": {
-    "x": 240,
-    "y": 160
+    "x": 250,
+    "y": 200
    },
-   "pace": 60,
-   "expectRate": 0.15,
+   "pace": 90,
+   "expectRate": 0.1,
    "devices": [
     {
-     "type": "lift",
-     "x": 371.7,
-     "y": 554,
-     "angle": 0.06,
+     "type": "launcher",
+     "x": 427.1,
+     "y": 550,
+     "angle": 0.128,
      "params": {
-      "strength": 0.72
+      "power": 15.95
      }
     },
     {
-     "type": "fan",
-     "x": 341.7,
-     "y": 297.2,
-     "angle": -0.078,
+     "type": "launcher",
+     "x": 838.2,
+     "y": 634.9,
+     "angle": 0.137,
      "params": {
-      "strength": 0.91
+      "power": 13.34
      }
     },
     {
-     "type": "ramp",
-     "x": 1077.5,
-     "y": 637.5,
-     "angle": 0.237
+     "type": "spring",
+     "x": 1223.6,
+     "y": 716.7,
+     "angle": 0.119,
+     "params": {
+      "power": 9.51
+     }
     }
    ]
   },
   {
    "id": "C",
-   "label": "Rotas paralelas (canhão + elevador) com braço basculante e autoextrator para volume",
+   "label": "Manual: feixe trator levando pedras por cima das muralhas",
    "manual": true,
    "devices": []
   }

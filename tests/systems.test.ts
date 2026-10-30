@@ -3,7 +3,7 @@ import { Wallet, priceFor, refundFor, rewardFor } from '../src/economy/Economy';
 import { ZoneProgress, emptyStats } from '../src/progression/Goals';
 import { Ledger } from '../src/progression/Ledger';
 import { Heat } from '../src/progression/Goals';
-import { TREE, buildMods, canBuyNode, unlockedDevices } from '../src/progression/SkillTree';
+import { TREE, buildMods, canBuyNode, levelCap, levelCost, unlockedDevices } from '../src/progression/SkillTree';
 import { DEFAULT_MODS } from '../src/sim/mods';
 import { SAVE_VERSION, SaveManager, defaultSave, migrate, type StorageLike } from '../src/save/SaveManager';
 import { Sim, type AbsorbInfo } from '../src/sim/Sim';
@@ -153,22 +153,40 @@ describe('árvore estelar', () => {
   });
 
   it('peças só existem depois de desbloqueadas', () => {
-    expect([...unlockedDevices(['core'])]).toEqual(['plank']);
-    expect(unlockedDevices(['core', 'ramp', 'funnel']).has('funnel')).toBe(true);
+    expect([...unlockedDevices({ core: 1 })]).toEqual(['plank']);
+    expect(unlockedDevices({ core: 1, ramp: 1, funnel: 1 }).has('funnel')).toBe(true);
   });
 
-  it('pré-requisitos, zona e créditos', () => {
-    const owned = new Set(['core']);
-    expect(canBuyNode(owned, 1000, 1, 'funnel').ok).toBe(false);
-    expect(canBuyNode(owned, 1000, 1, 'ramp').ok).toBe(true);
-    expect(canBuyNode(owned, 5, 1, 'ramp').ok).toBe(false);
-    expect(canBuyNode(new Set(['core', 'ramp', 'funnel', 'spring']), 1e6, 1, 'booster').ok).toBe(false);
-    expect(canBuyNode(new Set(['core', 'ramp', 'funnel', 'spring']), 1e6, 2, 'booster').ok).toBe(true);
+  it('pré-requisitos, planeta e créditos', () => {
+    const lv = { core: 1 };
+    expect(canBuyNode(lv, 1000, 1, 'funnel').ok).toBe(false);
+    expect(canBuyNode(lv, 1000, 1, 'ramp').ok).toBe(true);
+    expect(canBuyNode(lv, 5, 1, 'ramp').ok).toBe(false);
+    const base = { core: 1, ramp: 1, funnel: 1, spring: 1 };
+    expect(canBuyNode(base, 1e6, 1, 'launcher').ok).toBe(false);
+    expect(canBuyNode(base, 1e6, 2, 'launcher').ok).toBe(true);
   });
 
-  it('mineração automática vem da árvore', () => {
-    expect(buildMods(['core']).autoMineInterval).toBe(Infinity);
-    expect(buildMods(['core', 'pick1', 'auto1']).autoMineInterval).toBe(3);
+  it('níveis: custo crescente e teto que sobe a cada planeta', () => {
+    const n = TREE.find((x) => x.id === 'cadence')!;
+    expect(levelCost(n, 5)).toBeGreaterThan(levelCost(n, 4));
+    expect(levelCap(n, 1)).toBeLessThan(levelCap(n, 3));
+    expect(levelCap(n, 6)).toBe(n.maxLevel);
+    const lv = { core: 1, laser: 1, auto: 1, cadence: levelCap(n, 1) };
+    expect(canBuyNode(lv, 1e9, 1, 'cadence').ok).toBe(false);
+    expect(canBuyNode(lv, 1e9, 2, 'cadence').ok).toBe(true);
+  });
+
+  it('mineração automática e cadência vêm da árvore', () => {
+    expect(buildMods({ core: 1 }).autoMineInterval).toBe(Infinity);
+    expect(buildMods({ core: 1, laser: 1, auto: 1 }).autoMineInterval).toBe(3);
+    expect(buildMods({ core: 1, laser: 1, auto: 1, cadence: 10 }).autoMineInterval).toBeCloseTo(3 * Math.pow(0.9, 10));
+    expect(buildMods({ core: 1, splitter: 10, cascade: 10 }).multiExtractChance).toBeGreaterThan(1);
+  });
+
+  it('modificadores por tipo não vazam entre saves', () => {
+    buildMods({ 'r-metal': 5 });
+    expect(buildMods({ core: 1 }).typeValueMul.metallic).toBeUndefined();
   });
 });
 
@@ -195,8 +213,14 @@ describe('salvamento', () => {
     expect(d.version).toBe(SAVE_VERSION);
     // carteira global = inicial + carteiras das zonas + reembolso de peças extintas
     expect(d.credits).toBe(20 + 30 + 30);
-    expect(d.tree.owned).toEqual(['core']);
+    expect(d.tree.levels).toEqual({ core: 1 });
     expect(d.zones['1'].devices).toHaveLength(1);
+  });
+
+  it('v3 → v4 devolve os créditos gastos na árvore antiga', () => {
+    const d = migrate({ version: 3, credits: 100, tree: { owned: ['core', 'pick1', 'auto1', 'ramp'] }, zones: {} });
+    expect(d.credits).toBe(100 + 20 + 40 + 15);
+    expect(d.tree.levels).toEqual({ core: 1 });
   });
 
   it('save corrompido cai para a cópia de segurança', () => {

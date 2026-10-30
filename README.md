@@ -37,7 +37,7 @@ Você trabalha para a **Singularis**, empresa que comprou o sistema **Ônix**, c
 
 - **Meta:** alimente o buraco negro. Ele cresce em tempo real; quando a barra enche, engole o mapa e você segue para o próximo, maior.
 - **Calor (×):** entregas seguidas aquecem o buraco negro e multiplicam massa e créditos (×3, até ×6 com a árvore). Ele esfria sozinho — fluxo contínuo rende muito mais que entregar uma a uma.
-- **Árvore estelar:** árvore de ~40 nós comprados com créditos. Libera as peças (só a Placa vem liberada), a **mineração automática** do asteroide e melhorias de calor, feixe, campos e economia. Alguns nós exigem chegar a certa zona.
+- **Árvore estelar:** 51 nós e ~340 níveis em 7 ramos (Drone de mineração, Refino, Engenharia, Semente, Feixe trator, Construtores, Economia). Melhorias têm vários níveis com custo crescente; o teto de níveis sobe a cada planeta alcançado. O eixo principal é a extração: Cadência do drone (25 níveis, de 3 s até ~0,2 s por pedra), Frota de drones (até 5 drones), Divisor de feixe e Fratura em cascata (várias pedras por disparo). Os nós dos Construtores abrem no planeta IV.
 - **Peças:** Viga orbital, Trilho curvo, Coletor, Placa de pulso, Esteira magnética, Acelerador linear, Canhão de massa, Amortecedor inercial, Comporta, Soprador iônico, Poço gravitacional, Repulsor, Braço robótico, Elevador gravitacional e Sensor de passagem. A placa de pulso perde força com a massa (pedras densas mal sobem); o canhão de massa dispara qualquer pedra com a mesma velocidade. Os dois mostram o arco pontilhado ao posicionar; peças direcionais têm seta.
 - **Desafios:** objetivos opcionais por zona que pagam créditos.
 - Créditos são globais (valem em todas as zonas); cada zona guarda sua instalação.
@@ -61,9 +61,9 @@ Cada zona documenta em `src/world/zones/zoneN.json` ao menos duas estratégias a
 | 2 | canhão com anteparo (~35–50%) | ponte + acelerador + canhão (~25–35%) |
 | 3 | vigas sobre o poço + canhão (~75–95%) | esteiras + canhão (~60–85%) |
 | 4 | dois canhões de massa: sobre a muralha e do bolso para a câmara (~60–80%) | placas de pulso + vento iônico, só pedras leves (~25–40%) |
-| 5 | canhão no desfiladeiro (~40%) | elevador + soprador (~25–55%) |
+| 5 | três canhões, um por bolsão (~10–30%) | dois canhões + placa de pulso na última muralha (~15–45%) |
 
-Ferramentas de desenvolvimento em `tools/`: `simzone.ts` (simula e gera SVG de trajetórias), `optimize.ts` + `templates.ts` (busca de posições), `validate.ts`, e scripts Playwright de captura/interação.
+Ferramentas de desenvolvimento em `tools/`: `simzone.ts` (simula e gera SVG de trajetórias), `optimize.ts` + `templates.ts` (busca de posições), `stageopt.ts` e `sweep.ts` (calibram um estágio por vez), `exploit.ts` (procura atalhos que funcionem com uma peça só), `validate.ts`, e scripts Playwright de captura/interação.
 
 ## Limitações conhecidas
 

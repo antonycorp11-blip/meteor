@@ -163,7 +163,7 @@ export class ZoneProgress {
     const mult = this.heat.mult(this.mods);
     s.bestHeatMult = Math.max(s.bestHeatMult, mult);
     const credits = rewardFor(info.value, 1, info.auto) * mult;
-    const energy = info.mass * mult;
+    const energy = info.mass * mult * this.mods.growthMul;
     s.creditsEarned += credits;
     s.energyFed += energy;
     return { credits, energy, mult };

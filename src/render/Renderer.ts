@@ -133,8 +133,8 @@ export class Renderer {
   private meteors: Meteor[] = [];
   private nextMeteor = 1;
   private frame = 0;
-  private drone = { ang: -Math.PI / 2 - 0.6, target: -Math.PI / 2 - 0.6, bob: 0 };
-  private shots: { x: number; y: number; life: number; max: number; auto: boolean }[] = [];
+  private drones: { ang: number; target: number; bob: number }[] = [{ ang: -Math.PI / 2 - 0.6, target: -Math.PI / 2 - 0.6, bob: 0 }];
+  private shots: { x: number; y: number; life: number; max: number; auto: boolean; drone: number }[] = [];
   private titleOrbit: { a: number; r: number; w: number; c: string; s: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
@@ -314,7 +314,7 @@ export class Renderer {
     if (!zone || !this.terrain || !this.asteroid || !this.hole || !this.bg) return;
     this.frame++;
     this.particles.update(dt);
-    this.updateDrone(dt, s.time);
+    this.updateDrone(dt, s.time, 1 + s.sim.mods.extraDrones);
     const ctx = this.bctx;
     const cam = this.camera;
     const W = this.buffer.width;
@@ -923,44 +923,63 @@ export class Renderer {
     ctx.fillRect(cx, cy, u, u);
   }
 
-  /** Disparo do laser do drone até um ponto da superfície do asteroide. */
+  /** Disparo do laser de um drone até um ponto da superfície do asteroide. */
   laserShot(x: number, y: number, auto: boolean) {
     const a = this.zone?.asteroid;
     if (!a) return;
     const ang = Math.atan2(y - a.y, x - a.x);
-    this.drone.target = ang;
-    this.shots.push({ x: a.x + Math.cos(ang) * a.r * 0.92, y: a.y + Math.sin(ang) * a.r * 0.92, life: auto ? 0.16 : 0.22, max: auto ? 0.16 : 0.22, auto });
-    if (this.shots.length > 4) this.shots.shift();
+    // disparo manual sai sempre do drone principal; os automáticos, do drone mais próximo
+    let idx = 0;
+    if (auto) {
+      let best = Infinity;
+      this.drones.forEach((d, k) => {
+        const diff = Math.abs(Math.atan2(Math.sin(ang - d.target), Math.cos(ang - d.target)));
+        if (diff < best) {
+          best = diff;
+          idx = k;
+        }
+      });
+    }
+    this.drones[idx].target = ang;
+    this.shots.push({ x: a.x + Math.cos(ang) * a.r * 0.92, y: a.y + Math.sin(ang) * a.r * 0.92, life: auto ? 0.16 : 0.22, max: auto ? 0.16 : 0.22, auto, drone: idx });
+    if (this.shots.length > 8) this.shots.shift();
   }
 
-  private updateDrone(dt: number, time: number) {
-    const d = this.drone;
-    let diff = d.target - d.ang;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    d.ang += diff * Math.min(1, dt * 7);
-    // à deriva quando ocioso
-    d.target += dt * 0.12;
-    d.bob = Math.sin(time * 2.6) * 1.5;
+  private updateDrone(dt: number, time: number, count: number) {
+    while (this.drones.length < count) {
+      const last = this.drones[this.drones.length - 1];
+      this.drones.push({ ang: last.ang + 1.3, target: last.target + 1.3, bob: 0 });
+    }
+    if (this.drones.length > count) this.drones.length = Math.max(1, count);
+    this.drones.forEach((d, k) => {
+      let diff = d.target - d.ang;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      d.ang += diff * Math.min(1, dt * 7);
+      // à deriva quando ocioso
+      d.target += dt * 0.12;
+      d.bob = Math.sin(time * 2.6 + k * 1.7) * 1.5;
+    });
     for (const sh of this.shots) sh.life -= dt;
-    this.shots = this.shots.filter((sh) => sh.life > 0);
+    this.shots = this.shots.filter((sh) => sh.life > 0 && sh.drone < this.drones.length);
   }
 
-  private dronePos(): Vec {
+  private dronePos(k: number): Vec {
     const a = this.zone!.asteroid;
-    const r = a.r + 24;
-    return { x: a.x + Math.cos(this.drone.ang) * r, y: a.y + Math.sin(this.drone.ang) * r + this.drone.bob };
+    const d = this.drones[k];
+    const r = a.r + 24 + (k % 2) * 7;
+    return { x: a.x + Math.cos(d.ang) * r, y: a.y + Math.sin(d.ang) * r + d.bob };
   }
 
   private drawDrone(s: RenderState, z: number, tx: number, ty: number, fade: number) {
     if (fade <= 0) return;
     const ctx = this.bctx;
-    const p = this.dronePos();
     const u = this.ui();
     // feixes
     if (this.shots.length) {
-      const b0 = this.camera.toBuffer(p.x, p.y);
       this.additive(() => {
         for (const sh of this.shots) {
+          const p = this.dronePos(sh.drone);
+          const b0 = this.camera.toBuffer(p.x, p.y);
           const k = sh.life / sh.max;
           const b1 = this.camera.toBuffer(sh.x, sh.y);
           const len = Math.hypot(b1.x - b0.x, b1.y - b0.y);
@@ -985,18 +1004,21 @@ export class Renderer {
     }
     const spr = droneSprite();
     const a = this.zone!.asteroid;
-    const face = Math.atan2(a.y - p.y, a.x - p.x) - Math.PI / 2;
-    const ca = Math.cos(face);
-    const sa = Math.sin(face);
-    ctx.globalAlpha = fade;
-    ctx.setTransform(z * ca, z * sa, -z * sa, z * ca, tx + z * p.x, ty + z * p.y);
-    ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    // chama dos propulsores
-    if (this.frame % 3 === 0 && this.particles.pool.length < this.particles.cap * 0.6) {
-      const back = { x: -Math.cos(face + Math.PI / 2), y: -Math.sin(face + Math.PI / 2) };
-      this.particles.spawn({ x: p.x + back.x * 4, y: p.y + back.y * 4, vx: back.x * 14 + (Math.random() - 0.5) * 6, vy: back.y * 14 + (Math.random() - 0.5) * 6, life: 0.35, color: Math.random() < 0.5 ? '#ff9a3a' : '#ffd27a', size: 1, gravity: 0 });
+    for (let k = 0; k < this.drones.length; k++) {
+      const p = this.dronePos(k);
+      const face = Math.atan2(a.y - p.y, a.x - p.x) - Math.PI / 2;
+      const ca = Math.cos(face);
+      const sa = Math.sin(face);
+      ctx.globalAlpha = fade;
+      ctx.setTransform(z * ca, z * sa, -z * sa, z * ca, tx + z * p.x, ty + z * p.y);
+      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      // chama dos propulsores
+      if ((this.frame + k) % 3 === 0 && this.particles.pool.length < this.particles.cap * 0.6) {
+        const back = { x: -Math.cos(face + Math.PI / 2), y: -Math.sin(face + Math.PI / 2) };
+        this.particles.spawn({ x: p.x + back.x * 4, y: p.y + back.y * 4, vx: back.x * 14 + (Math.random() - 0.5) * 6, vy: back.y * 14 + (Math.random() - 0.5) * 6, life: 0.35, color: Math.random() < 0.5 ? '#ff9a3a' : '#ffd27a', size: 1, gravity: 0 });
+      }
     }
   }
 

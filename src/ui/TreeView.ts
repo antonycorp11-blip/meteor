@@ -1,5 +1,5 @@
 import { DEVICES } from '../machines/catalog';
-import { BRANCH_INFO, TREE, TREE_BY_ID, canBuyNode, nodeState, type TreeNode } from '../progression/SkillTree';
+import { BRANCH_INFO, ROMAN, TREE, TREE_BY_ID, canBuyNode, levelCap, levelCost, maxLevel, nodeState, type Levels, type TreeNode } from '../progression/SkillTree';
 import { deviceIcon } from '../render/ProceduralArt';
 import { clear, fmt, h, icon } from './dom';
 import type { GameApi } from './GameApi';
@@ -106,7 +106,7 @@ export class TreeView {
   }
 
   render() {
-    const owned = new Set(this.api.save.tree.owned);
+    const owned = this.api.save.tree.levels;
     const credits = this.api.save.credits;
     const reached = this.api.reachedZone();
     let minX = 0;
@@ -137,7 +137,7 @@ export class TreeView {
         line.setAttribute('y1', String(a.y + NODE / 2));
         line.setAttribute('x2', String(b.x + NODE / 2));
         line.setAttribute('y2', String(b.y + NODE / 2));
-        const st = owned.has(n.id) ? 'owned' : owned.has(pid) ? 'available' : 'locked';
+        const st = (owned[n.id] ?? 0) > 0 ? 'owned' : (owned[pid] ?? 0) > 0 ? 'available' : 'locked';
         line.setAttribute('class', `edge ${st}`);
         line.style.setProperty('--branch', BRANCH_INFO[n.branch].color);
         this.svg.append(line);
@@ -173,14 +173,17 @@ export class TreeView {
         iconEl,
         st === 'locked' ? h('span', { class: 'n-lock' }, icon('lock', 12)) : null,
         h('span', { class: 'n-name' }, n.name),
-        st !== 'owned' && n.cost > 0 ? h('span', { class: 'n-cost' }, zoneLocked ? `Zona ${n.requiresZone! >= 6 ? 'final' : n.requiresZone}` : `◆ ${fmt(n.cost)}`) : null,
+        maxLevel(n) > 1 ? h('span', { class: `n-level ${(owned[n.id] ?? 0) > 0 ? 'on' : ''}` }, `${owned[n.id] ?? 0}/${maxLevel(n)}`) : null,
+        st !== 'owned' && n.cost > 0
+          ? h('span', { class: 'n-cost' }, zoneLocked ? `Planeta ${ROMAN[Math.min(5, n.requiresZone!)]}` : (owned[n.id] ?? 0) >= levelCap(n, reached) ? 'teto' : `◆ ${fmt(levelCost(n, owned[n.id] ?? 0))}`)
+          : null,
       );
       this.canvas.append(el);
     }
     this.renderDetail(owned, credits, reached);
   }
 
-  private renderDetail(owned: Set<string>, credits: number, reached: number) {
+  private renderDetail(owned: Levels, credits: number, reached: number) {
     const n = TREE_BY_ID.get(this.selected)!;
     const st = nodeState(owned, n.id);
     const can = canBuyNode(owned, credits, reached, n.id);
@@ -190,11 +193,12 @@ export class TreeView {
       h('div', { class: 'td-branch', style: `color:${BRANCH_INFO[n.branch].color}` }, BRANCH_INFO[n.branch].name.toUpperCase()),
       h('div', { class: 'td-name' }, n.name),
       h('p', { class: 'td-desc' }, n.desc),
+      maxLevel(n) > 1 ? this.levelInfo(n, owned[n.id] ?? 0, reached) : null,
       piece ? h('p', { class: 'td-piece' }, piece.desc) : null,
       piece ? h('p', { class: 'td-how' }, `Como usar: ${piece.howTo}`) : null,
-      n.parents.length ? h('p', { class: 'td-req' }, `Requer: ${n.parents.map((p) => TREE_BY_ID.get(p)!.name).join(', ')}${n.requiresZone ? ` · ${n.requiresZone >= 6 ? 'campanha concluída' : `zona ${n.requiresZone}`}` : ''}`) : null,
+      n.parents.length ? h('p', { class: 'td-req' }, `Requer: ${n.parents.map((p) => TREE_BY_ID.get(p)!.name).join(', ')}${n.requiresZone ? ` · planeta ${ROMAN[Math.min(5, n.requiresZone)]}` : ''}`) : null,
       st === 'owned'
-        ? h('div', { class: 'td-owned' }, '✓ Desbloqueado')
+        ? h('div', { class: 'td-owned' }, maxLevel(n) > 1 ? '✓ Nível máximo' : '✓ Desbloqueado')
         : h(
             'button',
             {
@@ -204,9 +208,24 @@ export class TreeView {
                 if (this.api.buyNode(n.id)) this.render();
               },
             },
-            can.ok ? `Desbloquear · ◆ ${fmt(n.cost)}` : can.reason ?? '',
+            can.ok ? `${(owned[n.id] ?? 0) > 0 ? `Nível ${(owned[n.id] ?? 0) + 1}` : maxLevel(n) > 1 ? 'Nível 1' : 'Desbloquear'} · ◆ ${fmt(can.cost ?? n.cost)}` : can.reason ?? '',
           ),
     ];
     for (const p of parts) if (p) this.detail.append(p);
+  }
+
+  private levelInfo(n: TreeNode, lvl: number, reached: number) {
+    const max = maxLevel(n);
+    const cap = levelCap(n, reached);
+    const pips = h('div', { class: 'td-pips' });
+    for (let i = 1; i <= max; i++) pips.append(h('i', { class: i <= lvl ? 'on' : i <= cap ? '' : 'capped' }));
+    return h(
+      'div',
+      { class: 'td-levels' },
+      h('div', { class: 'td-lv' }, `Nível ${lvl}/${max}`, cap < max ? h('span', {}, ` · teto ${cap} neste planeta`) : null),
+      pips,
+      n.effect ? h('p', { class: 'td-effect' }, lvl > 0 ? `Agora: ${n.effect(lvl)}` : 'Ainda não comprado') : null,
+      n.effect && lvl < max ? h('p', { class: 'td-effect next' }, `Próximo: ${n.effect(lvl + 1)}`) : null,
+    );
   }
 }

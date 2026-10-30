@@ -115,7 +115,7 @@ export class Game implements GameApi {
     this.renderer = new Renderer(canvas);
     this.isTouchDevice = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
     document.body.classList.toggle('touch', this.isTouchDevice);
-    this.mods = buildMods(this.save.tree.owned);
+    this.mods = buildMods(this.save.tree.levels);
     this.wallet = new Wallet(this.save.credits);
     this.hud = new Hud(this);
     this.dock = new BuildDock(this);
@@ -563,7 +563,7 @@ export class Game implements GameApi {
       paid += d.paid;
       d.paid = 0;
     }
-    const recovered = Math.round(paid * 0.5);
+    const recovered = Math.round(paid * this.mods.recoverRate);
     this.wallet.earn(bonus + recovered);
     let next: { id: number; name: string } | null = null;
     let campaign = false;
@@ -629,15 +629,16 @@ export class Game implements GameApi {
     }
     if (!t.tree && !this.treeHintShown && this.wallet.credits >= 40) {
       this.treeHintShown = true;
-      this.hud.toast('Abra a Árvore estelar (T) e libere a Mineração automática: o asteroide passa a trabalhar sozinho.', 'goal', 7000);
+      this.hud.toast('Abra a Árvore estelar (T) e libere o Drone autônomo: ele minera sozinho.', 'goal', 7000);
     }
   }
 
   private checkGoals() {
     const newly = this.progress.checkGoals();
     for (const g of newly) {
-      this.wallet.earn(g.reward);
-      this.hud.toast(`Desafio cumprido: ${g.title} (+◆ ${g.reward})`, 'goal', 4200);
+      const reward = Math.round(g.reward * this.mods.goalRewardMul);
+      this.wallet.earn(reward);
+      this.hud.toast(`Desafio cumprido: ${g.title} (+◆ ${reward})`, 'goal', 4200);
       this.sfx.goal();
     }
     if (newly.length) this.persist();
@@ -649,9 +650,9 @@ export class Game implements GameApi {
 
   private updateHud() {
     const goals = this.progress.goalProgress();
-    const owned = new Set(this.save.tree.owned);
+    const levels = this.save.tree.levels;
     let affordable = 0;
-    for (const n of TREE) if (canBuyNode(owned, this.wallet.credits, this.reachedZone(), n.id).ok) affordable++;
+    for (const n of TREE) if (canBuyNode(levels, this.wallet.credits, this.reachedZone(), n.id).ok) affordable++;
     const growth = this.progress.growth();
     const data: HudData = {
       zoneId: this.zone.id,
@@ -674,6 +675,7 @@ export class Game implements GameApi {
       ghostReason: this.ghost ? this.ghostReason(this.ghost) : '',
       ghostPrice: this.ghost?.price ?? 0,
       autoMine: Number.isFinite(this.mods.autoMineInterval) ? this.mods.autoMineInterval : 0,
+      drones: 1 + this.mods.extraDrones,
     };
     this.hud.update(data, this.save.settings.showFps);
     this.refreshDock();
@@ -695,8 +697,8 @@ export class Game implements GameApi {
   }
 
   dockItems(): DockItem[] {
-    const owned = new Set(this.save.tree.owned);
-    const unlocked = unlockedDevices(owned);
+    const levels = this.save.tree.levels;
+    const unlocked = unlockedDevices(levels);
     const out: DockItem[] = [];
     let lockedShown = 0;
     for (const type of DEVICE_ORDER) {
@@ -706,7 +708,7 @@ export class Game implements GameApi {
         out.push({ type, name: def.name, desc: def.desc, howTo: def.howTo, limit: def.limit, price, affordable: this.wallet.canAfford(price), locked: false });
       } else {
         const node = TREE.find((n) => n.unlock === type);
-        if (!node || nodeState(owned, node.id) !== 'available' || lockedShown >= 3) continue;
+        if (!node || nodeState(levels, node.id) !== 'available' || lockedShown >= 3) continue;
         lockedShown++;
         out.push({ type, name: def.name, desc: def.desc, howTo: def.howTo, limit: def.limit, price: 0, affordable: false, locked: true, nodeName: node.name, nodeCost: node.cost });
       }
@@ -769,17 +771,17 @@ export class Game implements GameApi {
   }
 
   buyNode(id: string): boolean {
-    const owned = new Set(this.save.tree.owned);
-    const can = canBuyNode(owned, this.wallet.credits, this.reachedZone(), id);
-    if (!can.ok) return false;
+    const levels = this.save.tree.levels;
+    const can = canBuyNode(levels, this.wallet.credits, this.reachedZone(), id);
+    if (!can.ok || can.cost === undefined) return false;
     const node = TREE.find((n) => n.id === id)!;
-    if (!this.wallet.spend(node.cost)) return false;
-    this.save.tree.owned.push(id);
-    this.mods = buildMods(this.save.tree.owned);
+    if (!this.wallet.spend(can.cost)) return false;
+    levels[id] = (levels[id] ?? 0) + 1;
+    this.mods = buildMods(this.save.tree.levels);
     this.sim.mods = this.mods;
     this.progress.mods = this.mods;
     this.sfx.goal();
-    this.hud.toast(node.unlock ? `Nova peça: ${DEVICES[node.unlock].name}` : `Desbloqueado: ${node.name}`, 'good');
+    this.hud.toast(node.unlock ? `Nova peça: ${DEVICES[node.unlock].name}` : (node.maxLevel ?? 1) > 1 ? `${node.name} · nível ${levels[id]}` : `Desbloqueado: ${node.name}`, 'good');
     this.persist(true);
     this.refreshDock();
     return true;
@@ -1347,7 +1349,7 @@ export class Game implements GameApi {
 
   resetSave() {
     this.saveMgr.reset();
-    this.mods = buildMods(this.save.tree.owned);
+    this.mods = buildMods(this.save.tree.levels);
     this.wallet.credits = this.save.credits;
     this.sim.destroy();
     (this as unknown as { sim: Sim | undefined }).sim = undefined;

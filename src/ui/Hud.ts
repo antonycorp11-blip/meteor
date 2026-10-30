@@ -153,7 +153,7 @@ export class Hud {
       this.heatMult.textContent = mult;
       this.heatBox.title = `Calor: multiplicador ${mult} (máximo ×${d.heatMax}). Toque para entender.`;
     });
-    const am = d.autoMine > 0 ? `Mineração auto: 1 pedra / ${d.autoMine.toFixed(1)} s` : '';
+    const am = d.autoMine > 0 ? `${d.drones > 1 ? `${d.drones} drones` : 'Drone'}: ${((d.drones / d.autoMine) * 60).toFixed(0)} pedras/min` : '';
     this.set('auto', am, () => (this.autoMine.textContent = am));
     this.set('paused', d.paused, () => {
       this.pauseBtn.replaceChildren(icon(d.paused ? 'play' : 'pause', 20));

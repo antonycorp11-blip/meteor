@@ -21,6 +21,21 @@ export interface SimMods {
   heatMaxMult: number;
   refundRate: number;
   priceDiscount: number;
+  /** placa de pulso: potência / massa^expoente */
+  springMassExp: number;
+  /** desvio de mira do canhão */
+  launcherErrMul: number;
+  /** drones de mineração além do primeiro */
+  extraDrones: number;
+  /** quanto cada entrega faz a semente crescer */
+  growthMul: number;
+  /** valor por tipo de pedra */
+  typeValueMul: Partial<Record<string, number>>;
+  /** peso de sorteio das pedras valiosas */
+  valuableWeightMul: number;
+  goalRewardMul: number;
+  /** fração do valor das peças recuperada ao entregar o planeta */
+  recoverRate: number;
 }
 
 export const DEFAULT_MODS: SimMods = {
@@ -43,4 +58,12 @@ export const DEFAULT_MODS: SimMods = {
   heatMaxMult: 3,
   refundRate: 0.75,
   priceDiscount: 0,
+  springMassExp: 0.5,
+  launcherErrMul: 1,
+  extraDrones: 0,
+  growthMul: 1,
+  typeValueMul: {},
+  valuableWeightMul: 1,
+  goalRewardMul: 1,
+  recoverRate: 0.5,
 };
