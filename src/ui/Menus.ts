@@ -272,11 +272,11 @@ export class Menus {
           'div',
           {},
           h('h3', {}, 'Objetivo'),
-          h('p', {}, 'Quebre o asteroide e leve as pedras até o buraco negro. A cada entrega ele cresce; quando a barra do topo enche, ele engole o mapa inteiro e você segue para um buraco negro maior.'),
+          h('p', {}, 'Minere o planeta com o drone e leve as pedras até a semente de buraco negro. A cada entrega ela cresce e o planeta encolhe; quando a barra do topo enche, ela engole o canteiro e o planeta cai em Ônix.'),
           h('h3', {}, 'Calor ×'),
           h('p', {}, 'Entregas seguidas esquentam o buraco negro e multiplicam massa e créditos. Ele esfria sozinho: monte um fluxo contínuo para manter o calor alto.'),
           h('h3', {}, 'Automação'),
-          h('p', {}, 'Na Árvore estelar, libere a Mineração automática: o asteroide passa a soltar pedras sozinho na direção do seu último golpe. Peças novas também são liberadas na árvore.'),
+          h('p', {}, 'Na Árvore estelar, libere o Drone autônomo: ele minera sozinho na direção do seu último disparo. Peças novas também são liberadas na árvore. Crateras flutuantes seguram o que cai nelas; em alguns planetas só se constrói nas ancoragens (círculos verdes).'),
         ),
         h(
           'div',
@@ -285,7 +285,7 @@ export class Menus {
           h(
             'ul',
             {},
-            h('li', {}, 'Clique no asteroide: minera (segure para repetir).'),
+            h('li', {}, 'Clique no planeta: minera (segure para repetir).'),
             h('li', {}, 'Segure e arraste uma pedra: feixe de força limitada.'),
             h('li', {}, 'Arraste o fundo: move a câmera · roda/pinça: zoom.'),
             h('li', {}, 'Peças: escolha na barra à esquerda, posicione, gire (Q/E, roda ou alça amarela) e clique.'),

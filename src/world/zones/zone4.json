@@ -2,11 +2,11 @@
  "id": 4,
  "key": "ions",
  "name": "Maré de Íons",
- "subtitle": "Ruínas de uma megaestrutura antiga e vento iônico",
+ "subtitle": "Correntes iônicas que invertem e o anel dos Construtores",
  "theme": "ion",
- "intro": "Ruínas antigas e vento iônico. Separe o leve do pesado.",
- "width": 1360,
- "height": 760,
+ "intro": "Duas correntes mudam de sentido. Pedras leves voam com elas.",
+ "width": 1440,
+ "height": 800,
  "gravity": {
   "x": 0,
   "y": 1
@@ -14,280 +14,276 @@
  "terrain": [
   [
    [
-    0,
-    90
+    301.3,
+    700.3
    ],
    [
-    24,
-    90
+    308.1,
+    688.0
    ],
    [
-    24,
-    260
+    351.9,
+    712.0
    ],
    [
-    0,
-    260
+    345.2,
+    724.3
    ]
   ],
   [
    [
-    0,
-    260
+    241.0,
+    644
    ],
    [
-    170,
-    260
+    255.0,
+    644
    ],
    [
-    170,
-    760
+    308.1,
+    688.0
    ],
    [
-    0,
-    760
+    298.3,
+    697.8
    ]
   ],
   [
    [
-    170,
-    260
+    351.9,
+    712.0
    ],
    [
-    300,
-    305
+    405.0,
+    644
    ],
    [
-    300,
-    760
+    419.0,
+    644
    ],
    [
-    170,
-    760
+    361.7,
+    721.8
    ]
   ],
   [
    [
-    300,
-    640
+    731.3,
+    560.3
    ],
    [
-    520,
-    640
+    738.1,
+    548.0
    ],
    [
-    520,
-    760
+    781.9,
+    572.0
    ],
    [
-    300,
-    760
+    775.2,
+    584.3
    ]
   ],
   [
    [
-    520,
-    370
+    671.0,
+    504
    ],
    [
-    760,
-    400
+    685.0,
+    504
    ],
    [
-    760,
-    760
+    738.1,
+    548.0
    ],
    [
-    520,
-    760
+    728.3,
+    557.8
    ]
   ],
   [
    [
-    440,
-    0
+    781.9,
+    572.0
    ],
    [
-    1000,
-    0
+    835.0,
+    504
    ],
    [
-    1000,
-    170
+    849.0,
+    504
    ],
    [
-    440,
-    170
+    791.7,
+    581.8
    ]
   ],
   [
    [
-    760,
-    450
+    1031.7,
+    684.6
    ],
    [
-    980,
-    494
+    1036.5,
+    671.4
    ],
    [
-    980,
-    760
+    1083.5,
+    688.6
    ],
    [
-    760,
-    760
+    1078.7,
+    701.7
    ]
   ],
   [
    [
-    980,
-    560
+    971.0,
+    624
    ],
    [
-    1032,
-    591
+    985.0,
+    624
    ],
    [
-    1032,
-    760
+    1036.5,
+    671.4
    ],
    [
-    980,
-    760
+    1026.7,
+    681.2
    ]
   ],
   [
    [
-    1032,
-    620
+    1083.5,
+    688.6
    ],
    [
-    1080,
-    620
+    1135.0,
+    624
    ],
    [
-    1080,
-    760
+    1149.0,
+    624
    ],
    [
-    1032,
-    760
+    1093.3,
+    698.4
    ]
   ],
   [
    [
-    1080,
-    355
+    1145.0,
+    164.0
    ],
    [
-    1110,
-    355
+    1295.0,
+    164.0
    ],
    [
-    1110,
-    760
+    1295.0,
+    186.0
    ],
    [
-    1080,
-    760
+    1145.0,
+    186.0
    ]
   ],
   [
    [
-    1110,
-    450
+    1329.0,
+    215.0
    ],
    [
-    1215,
-    466
+    1351.0,
+    215.0
    ],
    [
-    1215,
-    760
+    1351.0,
+    385.0
    ],
    [
-    1110,
-    760
+    1329.0,
+    385.0
    ]
   ],
   [
    [
-    1215,
-    466
+    1244.3,
+    444.8
    ],
    [
-    1320,
-    446
+    1343.3,
+    377.0
    ],
    [
-    1320,
-    760
+    1355.7,
+    395.2
    ],
    [
-    1215,
-    760
+    1256.7,
+    463.0
    ]
   ],
   [
    [
-    1060,
-    0
+    1126.7,
+    176.5
    ],
    [
-    1360,
-    0
+    1146.0,
+    187.0
    ],
    [
-    1360,
-    120
+    1093.3,
+    283.5
    ],
    [
-    1060,
-    120
-   ]
-  ],
-  [
-   [
-    1320,
-    120
-   ],
-   [
-    1360,
-    120
-   ],
-   [
-    1360,
-    760
-   ],
-   [
-    1320,
-    760
+    1074.0,
+    273.0
    ]
   ]
  ],
  "asteroid": {
-  "x": 150,
-  "y": 190,
-  "r": 40
+  "x": 40,
+  "y": 380,
+  "r": 190
  },
  "blackHole": {
-  "x": 1215,
-  "y": 398,
-  "attractRadius": 95,
-  "absorbRadius": 15,
+  "x": 1220,
+  "y": 300,
+  "attractRadius": 92,
+  "absorbRadius": 14,
   "strength": 1000
  },
  "noBuild": [],
  "fields": [
   {
-   "id": "vento",
-   "label": "Vento iônico",
-   "x": 980,
-   "y": 170,
-   "w": 100,
-   "h": 360,
-   "ax": 360,
-   "ay": 0
+   "id": "v1",
+   "label": "Corrente iônica",
+   "x": 520,
+   "y": 60,
+   "w": 110,
+   "h": 700,
+   "ax": 300,
+   "ay": 0,
+   "period": 7,
+   "phase": 0
+  },
+  {
+   "id": "v2",
+   "label": "Corrente iônica",
+   "x": 880,
+   "y": 60,
+   "w": 110,
+   "h": 700,
+   "ax": 0,
+   "ay": -360,
+   "period": 5,
+   "phase": 1.7
   }
  ],
  "regions": [],
@@ -332,11 +328,11 @@
   {
    "id": "z4-eng",
    "tier": "engineering",
-   "title": "55% de eficiência e 20 pedras densas absorvidas",
+   "title": "25% de eficiência e 20 pedras densas absorvidas",
    "reqs": [
     {
      "kind": "efficiency",
-     "pct": 55
+     "pct": 25
     },
     {
      "kind": "denseDelivered",
@@ -371,83 +367,117 @@
   }
  ],
  "hints": [
-  "Pedras densas e metálicas mal sobem com a placa de pulso: use o canhão de massa.",
-  "Arremesse em etapas: primeiro sobre a muralha antiga, depois do bolso para a câmara.",
-  "O vento iônico sopra para a câmara e carrega mais as pedras leves."
+  "A barra sob cada corrente mostra quanto falta para ela inverter.",
+  "O canhão de massa é rápido demais para o vento desviar.",
+  "O anel dos Construtores só tem uma abertura: por baixo, à esquerda."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Canhão de massa sob a borda do platô e outro no bolso junto ao parapeito",
+   "label": "Três canhões de massa: rápidos o bastante para cruzar o vento",
    "aim": {
-    "x": 230,
-    "y": 140
+    "x": 300,
+    "y": 420
    },
-   "pace": 80,
-   "expectRate": 0.45,
+   "pace": 60,
+   "expectRate": 0.08,
    "devices": [
     {
-     "type": "funnel",
-     "x": 378,
-     "y": 355.4,
-     "angle": -0.2
-    },
-    {
      "type": "launcher",
-     "x": 396.8,
-     "y": 396.7,
-     "angle": 0.265,
+     "x": 340.2,
+     "y": 683.6,
+     "angle": 0.438,
      "params": {
-      "power": 10.9
+      "power": 13
      }
     },
     {
      "type": "launcher",
-     "x": 1059,
-     "y": 609,
-     "angle": 0.002,
+     "x": 770.2,
+     "y": 549.6,
+     "angle": 0.551,
      "params": {
-      "power": 14
+      "power": 12.14
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 1068.5,
+     "y": 664.9,
+     "angle": 0.321,
+     "params": {
+      "power": 12.15
      }
     }
    ]
   },
   {
    "id": "B",
-   "label": "Placas de pulso: só as pedras leves sobem, e o vento iônico as leva para a câmara",
+   "label": "Canhão, placa de pulso e canhão",
    "aim": {
-    "x": 230,
-    "y": 140
+    "x": 300,
+    "y": 420
    },
    "pace": 60,
-   "expectRate": 0.2,
+   "expectRate": 0.02,
    "devices": [
     {
-     "type": "funnel",
-     "x": 380.4,
-     "y": 391.3,
-     "angle": -0.137
-    },
-    {
-     "type": "spring",
-     "x": 356.3,
-     "y": 455.6,
-     "angle": 0.73,
+     "type": "launcher",
+     "x": 332.2,
+     "y": 684.4,
+     "angle": 0.442,
      "params": {
-      "power": 9.04
+      "power": 11.3
      }
     },
     {
      "type": "spring",
-     "x": 1054,
-     "y": 615,
-     "angle": -0.06,
+     "x": 764.6,
+     "y": 550.9,
+     "angle": 0.43,
      "params": {
-      "power": 10
+      "power": 9.58
+     }
+    },
+    {
+     "type": "launcher",
+     "x": 1065.2,
+     "y": 664,
+     "angle": 0.283,
+     "params": {
+      "power": 11.2
      }
     }
    ]
   }
  ],
- "growthTarget": 7000
+ "growthTarget": 3500,
+ "anchors": [
+  {
+   "x": 335.8,
+   "y": 689.5,
+   "r": 34
+  },
+  {
+   "x": 765.8,
+   "y": 549.5,
+   "r": 34
+  },
+  {
+   "x": 1064.1,
+   "y": 668.7,
+   "r": 34
+  },
+  {
+   "x": 470,
+   "y": 420,
+   "r": 42
+  },
+  {
+   "x": 930,
+   "y": 300,
+   "r": 42
+  }
+ ],
+ "movers": []
 }

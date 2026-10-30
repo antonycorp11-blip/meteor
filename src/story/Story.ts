@@ -46,7 +46,7 @@ export const PLANETS: Record<number, PlanetInfo> = {
     size: 7,
     briefing: {
       title: 'Planeta I · Cinza',
-      body: ['O mais próximo de Ônix, tostado pela maré de calor do disco. Um paredão em ombro separa o bloco da semente.', 'Vigas, coletores e uma placa de pulso bastam aqui. Aprenda o ritmo: entregas seguidas aquecem a semente.'],
+      body: ['O mais próximo de Ônix, tostado pela maré de calor do disco. A semente flutua acima do caminho natural das pedras.', 'As crateras soltas no espaço seguram o que cai nelas. Use-as como degraus. Entregas seguidas aquecem a semente.'],
     },
     debrief: {
       title: 'Cinza entregue',
@@ -61,7 +61,7 @@ export const PLANETS: Record<number, PlanetInfo> = {
     size: 8,
     briefing: {
       title: 'Planeta II · Órion-b',
-      body: ['Rachado ao meio por um abismo antigo. A semente ficou numa câmara elevada do outro lado.', 'Vai ser preciso erguer ou arremessar. O canhão de massa está nas patentes.'],
+      body: ['Órion-b tem campo magnético instável: só conseguimos fixar equipamento nas ancoragens que a equipe instalou.', 'A semente ficou no alto, atrás de uma coluna de rocha. Suba em etapas. O canhão de massa está nas patentes.'],
     },
     debrief: {
       title: 'Órion-b entregue',
@@ -76,7 +76,7 @@ export const PLANETS: Record<number, PlanetInfo> = {
     size: 9,
     briefing: {
       title: 'Planeta III · Basalto',
-      body: ['Derrames de basalto formaram corredores em zigue-zague e poços fundos.', 'Mantenha o fluxo vivo: pedra parada esfria a semente.'],
+      body: ['Uma lâmina de basalto do tamanho de um prédio gira entre o planeta e a semente, e dois blocos orbitam a própria semente.', 'Passe por baixo da lâmina ou acerte o tempo. Nada pode ser construído no caminho dela.'],
     },
     debrief: {
       title: 'Basalto entregue',
@@ -93,7 +93,7 @@ export const PLANETS: Record<number, PlanetInfo> = {
       title: 'Planeta IV · Íon',
       body: [
         'Encontramos ruínas de uma megaestrutura que não consta em nenhum registro. Internamente, chamamos seus autores de Construtores.',
-        'O vento iônico ainda corre pelos dutos deles, soprando na direção da câmara da semente. Ele carrega as pedras leves; as pesadas precisam do canhão.',
+        'Duas correntes iônicas atravessam o canteiro e invertem de sentido em ciclos. Pedras leves voam com elas; o canhão é rápido demais para ser desviado.',
       ],
     },
     debrief: {
@@ -109,7 +109,7 @@ export const PLANETS: Record<number, PlanetInfo> = {
     size: 10,
     briefing: {
       title: 'Planeta V · Horizonte',
-      body: ['O mais distante de Ônix. Três barreiras que parecem erguidas de propósito.', 'Os Construtores protegiam alguma coisa aqui. Siga o contrato.'],
+      body: ['O mais distante de Ônix. Os Construtores dobraram a gravidade daqui: numa coluna tudo cai para cima, numa faixa tudo cai para o lado.', 'Eles protegiam alguma coisa. Siga o contrato.'],
     },
     debrief: {
       title: 'Contrato Ônix concluído',

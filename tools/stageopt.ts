@@ -49,7 +49,7 @@ function evaluate(p: P[], seed = 3): number {
 let best: P[] | null = null;
 let bs = -1;
 for (let i = 0; i < trials; i++) {
-  const c = best && i > trials * 0.35 ? perturb(best, 1 - i / trials + 0.1) : sample();
+  const c = best && bs > 0 && i > trials * 0.35 ? perturb(best, 1 - i / trials + 0.1) : sample();
   const s = evaluate(c);
   if (s > bs) {
     bs = s;

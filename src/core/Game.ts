@@ -239,6 +239,7 @@ export class Game implements GameApi {
     this.undoStack = [];
     this.floaters = [];
     this.acc = 0;
+    this.renderer.setDelivered(Object.values(this.save.zones).filter((z) => z.complete).length);
     this.renderer.setZone(zone, this.save.settings.highContrast);
     const cam = this.renderer.camera;
     this.updateInsets();
@@ -612,7 +613,7 @@ export class Game implements GameApi {
     if (this.zone.id !== 1 || this.menus.isOpen()) return null;
     const t = this.save.tutorial;
     const a = this.zone.asteroid;
-    if (!t.extracted) return { x: a.x, y: a.y - a.r - 22, text: this.isTouchDevice ? 'TOQUE NO ASTEROIDE' : 'CLIQUE NO ASTEROIDE' };
+    if (!t.extracted) return { x: a.x + this.sim.planetR() * 0.75 + 70, y: a.y - this.sim.planetR() * 0.2, text: this.isTouchDevice ? 'TOQUE NO PLANETA' : 'CLIQUE NO PLANETA' };
     if (!t.grabbed) {
       let newest: { x: number; y: number } | null = null;
       for (const f of this.sim.fragments.values()) newest = f.body.position;

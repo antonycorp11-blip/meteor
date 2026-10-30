@@ -375,54 +375,96 @@ export interface AsteroidArt {
   glow: Sprite;
 }
 
-export function makeAsteroid(r: number, seed: number): AsteroidArt {
+interface PlanetStyle {
+  ramp: string[];
+  /** tamanho das placas da crosta */
+  cell: number;
+  crack: [string, string, string];
+  crackCount: number;
+  crystal: [string, string, string, string] | null;
+  /** manchas luminosas (respiradouros, gêiseres) */
+  vents: string | null;
+  /** grade de ruínas gravada na crosta */
+  ruins: string | null;
+  /** calota clara no polo */
+  cap: string | null;
+  faceted: boolean;
+}
+
+const PLANET_STYLES: Record<string, PlanetStyle> = {
+  ash: { ramp: ['#1a0a08', '#2e130e', '#452016', '#5e2f1e', '#7a4128', '#9a5a36'], cell: 0.07, crack: ['#5a1a10', '#ff8a2a', '#fff0c0'], crackCount: 11, crystal: ['#8a3410', '#e06a1e', '#ffb34b', '#fff0c0'], vents: null, ruins: null, cap: null, faceted: false },
+  orion: { ramp: ['#0a1220', '#142238', '#1e3452', '#2c4a70', '#46689a', '#7aa0cc'], cell: 0.09, crack: ['#0a2a40', '#55d7e8', '#e8ffff'], crackCount: 8, crystal: null, vents: null, ruins: null, cap: '#d8eeff', faceted: false },
+  basalt: { ramp: ['#0b100c', '#151d16', '#202c20', '#2e3e2c', '#40553a', '#5a6e4a'], cell: 0.055, crack: ['#2a2a08', '#d8d040', '#fffff0'], crackCount: 5, crystal: null, vents: '#e8e05a', ruins: null, cap: null, faceted: false },
+  ion: { ramp: ['#0c1c20', '#16303a', '#224a54', '#356a72', '#5a9496', '#a0d0cc'], cell: 0.1, crack: ['#0a3038', '#7fe6e0', '#f0fffc'], crackCount: 4, crystal: null, vents: null, ruins: '#7fe6e0', cap: '#e8fffc', faceted: false },
+  cathedral: { ramp: ['#120a22', '#20123c', '#311c58', '#472a7a', '#6440a0', '#8a62c8'], cell: 0.12, crack: ['#5a3a10', '#ffb34b', '#fff2c8'], crackCount: 7, crystal: ['#7a3a10', '#e07a20', '#ffb34b', '#fff2c8'], vents: null, ruins: null, cap: null, faceted: true },
+};
+
+/** Planeta-fonte: grande, com a crosta e os detalhes do tema de cada mundo. */
+export function makeAsteroid(r: number, seed: number, theme = 'ash'): AsteroidArt {
+  const st = PLANET_STYLES[theme] ?? PLANET_STYLES.ash;
   const pad = 8;
-  const size = r * 2 + pad * 2;
+  const size = Math.ceil(r * 2 + pad * 2);
   const g = new PixelGrid(size, size, size / 2, size / 2);
   const glow = new PixelGrid(size, size, size / 2, size / 2);
   const rng = new Rng(seed);
-  const ramp6 = ['#140c18', '#24152a', '#36203a', '#4a2e4a', '#62405c', '#7e5a70'];
-  const radiusAt = (a: number) => r * (1 + 0.07 * (fbm(Math.cos(a) * 1.6 + 5, Math.sin(a) * 1.6 + 5, seed, 3) - 0.5) * 2);
-  const S = 9;
-  for (let y = -r - pad; y < r + pad; y++) {
-    for (let x = -r - pad; x < r + pad; x++) {
+  const ramp6 = st.ramp;
+  const radiusAt = (a: number) => r * (1 + 0.035 * (fbm(Math.cos(a) * 2.2 + 5, Math.sin(a) * 2.2 + 5, seed, 3) - 0.5) * 2);
+  const S = Math.max(7, Math.round(r * st.cell));
+  for (let y = Math.floor(-r - pad); y < r + pad; y++) {
+    for (let x = Math.floor(-r - pad); x < r + pad; x++) {
       const px = x + 0.5;
       const py = y + 0.5;
       const dd = Math.hypot(px, py);
       const a = Math.atan2(py, px);
       const R = radiusAt(a);
       if (dd > R) continue;
-      // esfera iluminada de cima/esquerda + blocos
       const nz = Math.sqrt(Math.max(0, 1 - (dd / R) ** 2));
       const lambert = (px / R) * LIGHT.x + (py / R) * LIGHT.y + nz * 0.6;
-      const gx = Math.floor((x + 100) / S);
-      const gy = Math.floor((y + 100) / S);
+      const gx = Math.floor((x + 1000) / S);
+      const gy = Math.floor((y + 1000) / S);
       let d1 = 1e9;
       let d2 = 1e9;
       let bid = 0;
+      let bx = 0;
+      let by = 0;
       for (let j = -1; j <= 1; j++)
         for (let k = -1; k <= 1; k++) {
-          const sx = (gx + k + 0.2 + hash2(gx + k, gy + j, seed) * 0.6) * S - 100;
-          const sy = (gy + j + 0.2 + hash2(gx + k, gy + j, seed + 1) * 0.6) * S - 100;
+          const sx = (gx + k + 0.2 + hash2(gx + k, gy + j, seed) * 0.6) * S - 1000;
+          const sy = (gy + j + 0.2 + hash2(gx + k, gy + j, seed + 1) * 0.6) * S - 1000;
           const q = (x - sx) ** 2 + (y - sy) ** 2;
           if (q < d1) {
             d2 = d1;
             d1 = q;
             bid = (gx + k) * 31 + gy + j;
+            bx = sx;
+            by = sy;
           } else if (q < d2) d2 = q;
         }
       const edge = Math.sqrt(d2) - Math.sqrt(d1);
-      let t = 0.25 + lambert * 0.45 + (hash2(bid, 1, seed) - 0.5) * 0.18 + (bayer(x, y) - 0.5) * 0.12;
-      if (edge < 1.2) t -= 0.2;
+      let t = 0.22 + lambert * 0.5 + (hash2(bid, 1, seed) - 0.5) * 0.18 + (bayer(x, y) - 0.5) * 0.1;
+      t += (fbm(px / (r * 0.35), py / (r * 0.35), seed + 3, 3) - 0.5) * 0.3;
+      if (st.faceted) {
+        // cristal: cada faceta tem a própria inclinação
+        const fx = (x - bx) / S;
+        const fy = (y - by) / S;
+        t += (fx * (hash2(bid, 4, seed) - 0.5) + fy * (hash2(bid, 5, seed) - 0.5)) * 0.9;
+      }
+      if (edge < 1.2) t -= 0.18;
+      if (st.cap && py < -R * 0.72 + Math.sin(px / 9) * 4) t += 0.35;
       if (dd > R - 1.3) t = 0;
-      g.set(x + g.ox, y + g.oy, ramp6[Math.max(0, Math.min(5, Math.floor(t * 6)))]);
+      let c = ramp6[Math.max(0, Math.min(5, Math.floor(t * 6)))];
+      if (st.cap && py < -R * 0.72 + Math.sin(px / 9) * 4 && t > 0.55) c = st.cap;
+      // borda de atmosfera iluminada
+      if (dd > R - 3 && lambert > 0.25) c = mix(c, '#ffffff', 0.25);
+      g.set(x + g.ox, y + g.oy, c);
     }
   }
   // crateras
-  for (let k = 0; k < 7; k++) {
+  const nCraters = Math.round(6 + r / 25);
+  for (let k = 0; k < nCraters; k++) {
     const a = rng.next() * Math.PI * 2;
-    const dd = rng.range(0, r * 0.6);
-    const cr = rng.range(3, r * 0.17);
+    const dd = rng.range(0, r * 0.75);
+    const cr = rng.range(3, r * 0.13);
     const cx = Math.cos(a) * dd;
     const cy = Math.sin(a) * dd;
     g.circle(cx, cy, cr, (x, y) => {
@@ -430,33 +472,107 @@ export function makeAsteroid(r: number, seed: number): AsteroidArt {
       return rimv > 0.45 ? ramp6[4] : rimv < -0.3 ? ramp6[0] : ramp6[1];
     });
   }
-  // fissuras luminosas e minério hexagonal (camada de brilho separada para pulsar)
-  for (let k = 0; k < 7; k++) {
+  // fissuras luminosas (camada de brilho separada para pulsar)
+  for (let k = 0; k < st.crackCount; k++) {
     let a = rng.next() * Math.PI * 2;
-    let x = Math.cos(a) * r * 0.1;
-    let y = Math.sin(a) * r * 0.1;
-    const len = rng.int(Math.floor(r * 0.55), Math.floor(r * 1.0));
-    for (let s = 0; s < len; s++) {
-      if (Math.hypot(x, y) > r - 3) break;
+    let x = Math.cos(a) * r * rng.range(0.05, 0.6);
+    let y = Math.sin(a) * r * rng.range(0.05, 0.6);
+    const len = rng.int(Math.floor(r * 0.4), Math.floor(r * 0.9));
+    for (let q = 0; q < len; q++) {
+      if (Math.hypot(x, y) > r - 4) break;
       const fx = Math.floor(x);
       const fy = Math.floor(y);
-      g.set(fx + g.ox, fy + g.oy, '#5a1a10');
-      glow.set(fx + glow.ox, fy + glow.oy, s % 6 === 0 ? '#fff0c0' : '#ff8a2a');
-      if (s % 2 === 0) glow.set(fx + glow.ox + 1, fy + glow.oy, '#d8501a', 200);
-      a += rng.range(-0.55, 0.55);
+      g.set(fx + g.ox, fy + g.oy, st.crack[0]);
+      glow.set(fx + glow.ox, fy + glow.oy, q % 7 === 0 ? st.crack[2] : st.crack[1]);
+      if (q % 2 === 0) glow.set(fx + glow.ox + 1, fy + glow.oy, st.crack[1], 170);
+      a += rng.range(-0.5, 0.5);
       x += Math.cos(a);
       y += Math.sin(a);
     }
   }
-  const crystal: [string, string, string, string] = ['#8a3410', '#e06a1e', '#ffb34b', '#fff0c0'];
-  const setG = (px: number, py: number, c: string) => glow.set(px + glow.ox, py + glow.oy, c);
-  for (let k = 0; k < 9; k++) {
-    const a = rng.next() * Math.PI * 2;
-    const dd = rng.range(r * 0.15, r * 0.8);
-    drawCrystal(setG, Math.round(Math.cos(a) * dd), Math.round(Math.sin(a) * dd) + 4, rng.int(4, 7), rng.int(2, 4), rng.range(-0.3, 0.3), crystal);
+  // respiradouros de enxofre
+  if (st.vents) {
+    for (let k = 0; k < 10; k++) {
+      const a = rng.next() * Math.PI * 2;
+      const dd = rng.range(0, r * 0.8);
+      const cx = Math.cos(a) * dd;
+      const cy = Math.sin(a) * dd;
+      const vr = rng.range(2, 4.5);
+      glow.circle(cx, cy, vr, (x, y) => (Math.hypot(x - cx, y - cy) < vr * 0.5 ? '#ffffff' : st.vents!));
+    }
+  }
+  // grade de ruínas: linhas retas gravadas que ainda brilham
+  if (st.ruins) {
+    for (let k = 0; k < 9; k++) {
+      const horiz = k % 2 === 0;
+      const off = rng.range(-r * 0.7, r * 0.7);
+      const from = rng.range(-r * 0.8, 0);
+      const len = rng.range(r * 0.3, r * 0.8);
+      for (let q = 0; q < len; q++) {
+        const x = horiz ? from + q : off;
+        const y = horiz ? off : from + q;
+        if (Math.hypot(x, y) > r - 5) continue;
+        if (q % 9 === 4) continue;
+        glow.set(Math.floor(x) + glow.ox, Math.floor(y) + glow.oy, st.ruins, 230);
+      }
+    }
+  }
+  if (st.crystal) {
+    const setG = (px: number, py: number, c: string) => glow.set(px + glow.ox, py + glow.oy, c);
+    for (let k = 0; k < Math.round(6 + r / 20); k++) {
+      const a = rng.next() * Math.PI * 2;
+      const dd = rng.range(r * 0.15, r * 0.85);
+      drawCrystal(setG, Math.round(Math.cos(a) * dd), Math.round(Math.sin(a) * dd) + 4, rng.int(4, 9), rng.int(2, 4), rng.range(-0.3, 0.3), st.crystal);
+    }
   }
   g.outline('#08040c');
   return { base: g.toSprite(), glow: glow.toSprite() };
+}
+
+/** Bloco de rocha para obstáculos móveis (polígono convexo local). */
+export function makeRockSprite(poly: [number, number][], theme: string, seed: number, kind: 'rock' | 'hull' | 'ring'): Sprite {
+  const t = THEMES[theme as keyof typeof THEMES] ?? THEMES.ash;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of poly) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  const pad = 2;
+  const ox = Math.ceil(-minX) + pad;
+  const oy = Math.ceil(-minY) + pad;
+  const g = new PixelGrid(Math.ceil(maxX - minX) + pad * 2 + 1, Math.ceil(maxY - minY) + pad * 2 + 1, ox, oy);
+  const P = poly.map(([x, y]) => ({ x, y }));
+  const inside = (x: number, y: number) => {
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i];
+      const b = P[(i + 1) % P.length];
+      if ((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x) < 0) return false;
+    }
+    return true;
+  };
+  for (let y = Math.floor(minY); y <= maxY; y++)
+    for (let x = Math.floor(minX); x <= maxX; x++) {
+      if (!inside(x + 0.5, y + 0.5)) continue;
+      const edgeIn = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
+      let c: string;
+      if (kind === 'ring') {
+        const v = 0.45 + (fbm(x / 6, y / 6, seed, 2) - 0.5) * 0.4 + (bayer(x, y) - 0.5) * 0.12;
+        c = METAL[Math.max(1, Math.min(5, Math.floor(v * 6)))];
+        if (Math.abs(y) < 1.5 && x % 6 !== 0) c = t.crystal[2];
+      } else {
+        const v = 0.4 + (fbm(x / 5, y / 5, seed, 3) - 0.5) * 0.6 + (-y / Math.max(8, maxY - minY)) * 0.3 + (bayer(x, y) - 0.5) * 0.12;
+        c = t.rock[Math.max(0, Math.min(5, Math.floor(v * 6)))];
+        if (hash2(x >> 2, y >> 2, seed) > 0.96) c = t.crystal[2];
+      }
+      if (edgeIn) c = inside(x + 0.5, y - 0.5) ? t.rockLine : t.rim;
+      g.set(x + ox, y + oy, c);
+    }
+  return g.toSprite();
 }
 
 // ---------------------------------------------------------------------------
@@ -724,11 +840,11 @@ export function deviceArt(type: DeviceType): DeviceArt {
         for (const s of solids) g.poly(s, metal(s, BRASS));
         g.line(-14, 7, 14, 7, lit ? '#ffffff' : PAL.cyan);
         g.line(-14, 8, 14, 8, lit ? PAL.core : '#1f9ab0');
-        g.set(g.ox - 14, g.oy - 4, PAL.core);
-        g.set(g.ox + 13, g.oy - 8, PAL.core);
+        g.set(g.ox - 14, g.oy + 1, PAL.core);
+        g.set(g.ox + 13, g.oy - 1, PAL.core);
         return finish(g);
       };
-      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 6, color: PAL.cyan, size: 18 }, { x: 13, y: -8, color: PAL.amber, size: 8 }] };
+      art = { base: mk(false), lit: mk(true), lights: [{ x: 0, y: 6, color: PAL.cyan, size: 18 }, { x: 13, y: -1, color: PAL.amber, size: 8 }] };
       break;
     }
     case 'fan': {
@@ -1174,4 +1290,56 @@ export function arrowSprite(): Sprite {
   if (arrowCache) return arrowCache;
   arrowCache = fromRows(['k   ', 'kyk ', 'kyyk', 'kyyyk', 'kyyk', 'kyk ', 'k   '].map((r) => r.padEnd(5, ' ')), { k: '#2a1006', y: '#ffd27a' }, 2, 3);
   return arrowCache;
+}
+
+/** Ônix, o buraco negro central do sistema, visto de longe: disco inclinado e anel de fótons. */
+export function makeOnixSprite(r: number): Sprite {
+  const W = Math.ceil(r * 4.4);
+  const H = Math.ceil(r * 2.6);
+  const g = new PixelGrid(W, H, W / 2, H / 2);
+  const disk = ['#3a1030', '#6a1e40', '#a8343a', '#e0663a', '#ffb060', '#fff0c8'];
+  // disco de acreção (elipse achatada), metade de trás primeiro
+  for (let y = -H / 2; y < H / 2; y++)
+    for (let x = -W / 2; x < W / 2; x++) {
+      const ex = x / (r * 2.1);
+      const ey = y / (r * 0.55);
+      const d = Math.hypot(ex, ey);
+      if (d > 1 || d < 0.42) continue;
+      const v = 1 - (d - 0.42) / 0.58;
+      const swirl = valueNoise(Math.atan2(ey, ex) * 3, d * 6, 77) * 0.35;
+      const t = v * 0.8 + swirl + (bayer(x + 64, y + 64) - 0.5) * 0.15;
+      g.set(Math.floor(x + g.ox), Math.floor(y + g.oy), disk[Math.max(0, Math.min(5, Math.floor(t * 6)))], 230);
+    }
+  // lente: arco de luz por cima do horizonte
+  for (let a = Math.PI; a < Math.PI * 2; a += 0.01) {
+    for (const k of [1.15, 1.22]) {
+      const x = Math.cos(a) * r * k;
+      const y = Math.sin(a) * r * k * 0.95;
+      g.set(Math.floor(x + g.ox), Math.floor(y + g.oy), k < 1.2 ? '#fff0c8' : '#ffb060', 220);
+    }
+  }
+  g.circle(0, 0, r, () => '#000000');
+  for (let a = 0; a < Math.PI * 2; a += 0.01) g.set(Math.floor(Math.cos(a) * r + g.ox), Math.floor(Math.sin(a) * r + g.oy), '#ffd8a0', 200);
+  // frente do disco passa na frente do buraco
+  for (let y = 0; y < r * 0.4; y++)
+    for (let x = -W / 2; x < W / 2; x++) {
+      const ex = x / (r * 2.1);
+      const ey = y / (r * 0.55);
+      const d = Math.hypot(ex, ey);
+      if (d > 1 || d < 0.42 || y > r * 0.32) continue;
+      const v = 1 - (d - 0.42) / 0.58;
+      const t = v * 0.85 + (bayer(x + 64, y + 64) - 0.5) * 0.15;
+      g.set(Math.floor(x + g.ox), Math.floor(y + g.oy), disk[Math.max(0, Math.min(5, Math.floor(t * 6)))], 240);
+    }
+  return g.toSprite();
+}
+
+/** Cargueiro da Singularis (silhueta pequena com luzes). */
+export function cargoSprite(): Sprite {
+  return fromRows(
+    ['      kk          ', '    kkggkkkkkk    ', 'kkkkgsssgggggskk  ', 'kccksssssssssssskk', 'kkkkgsssgggggskk  ', '    kkggkkkkkk    ', '      kk          '],
+    { k: '#0a0614', g: '#3a4660', s: '#7a8aa8', c: '#55d7e8' },
+    9,
+    3,
+  );
 }

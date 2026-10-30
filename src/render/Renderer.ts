@@ -15,6 +15,9 @@ import {
   deviceArt,
   fragmentGlowColor,
   makeAsteroid,
+  makeRockSprite,
+  makeOnixSprite,
+  cargoSprite,
   makeBackground,
   makeBlackHole,
   makeFragmentSprite,
@@ -52,6 +55,8 @@ export interface Handle {
   y: number;
   r: number;
 }
+
+const PLANET_GLOW: Record<string, string> = { ash: '#ff7a2a', orion: '#55a8e8', basalt: '#c8d040', ion: '#55d7e8', cathedral: '#b070ff' };
 
 export type CursorKind = 'arrow' | 'reticle' | 'clawOpen' | 'clawClosed' | 'hand' | 'none';
 
@@ -133,6 +138,16 @@ export class Renderer {
   private meteors: Meteor[] = [];
   private nextMeteor = 1;
   private frame = 0;
+  private moverSprites: Sprite[] = [];
+  private planetR = 40;
+  /** planetas já entregues: Ônix cresce no fundo */
+  private delivered = 0;
+  private onix: Sprite | null = null;
+  private nextPlanet: Sprite | null = null;
+  private ships: { x: number; y: number; vx: number; blink: number; scale: number }[] = [];
+  private nextShip = 4;
+  private comets: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+  private nextComet = 12;
   private drones: { ang: number; target: number; bob: number }[] = [{ ang: -Math.PI / 2 - 0.6, target: -Math.PI / 2 - 0.6, bob: 0 }];
   private shots: { x: number; y: number; life: number; max: number; auto: boolean; drone: number }[] = [];
   private titleOrbit: { a: number; r: number; w: number; c: string; s: number }[] = [];
@@ -208,7 +223,12 @@ export class Renderer {
     this.zone = zone;
     this.terrain = makeTerrainArt(zone, highContrast);
     this.terrainKey = '';
-    this.asteroid = makeAsteroid(zone.asteroid.r, zone.id * 31 + 5);
+    this.asteroid = makeAsteroid(zone.asteroid.r, zone.id * 31 + 5, zone.theme);
+    this.onix = makeOnixSprite(Math.round(10 + this.delivered * 4 + zone.id * 2));
+    this.nextPlanet = zone.id < 5 ? makeAsteroid(14 + zone.id * 2, (zone.id + 1) * 31 + 5, ['ash', 'orion', 'basalt', 'ion', 'cathedral'][zone.id]).base : null;
+    this.ships = [];
+    this.comets = [];
+    this.moverSprites = (zone.movers ?? []).map((m, i) => makeRockSprite(m.poly, zone.theme, zone.id * 101 + i, m.kind));
     this.hole = makeBlackHole(zone.blackHole.absorbRadius);
     this.bg = makeBackground(zone);
     this.fragSprites.clear();
@@ -222,6 +242,13 @@ export class Renderer {
   rebuildTerrain(highContrast: boolean) {
     if (this.zone) this.terrain = makeTerrainArt(this.zone, highContrast);
     this.terrainKey = '';
+  }
+
+  /** Quantos planetas já foram entregues (Ônix cresce no fundo). */
+  setDelivered(n: number) {
+    if (n === this.delivered) return;
+    this.delivered = n;
+    if (this.zone) this.onix = makeOnixSprite(Math.round(10 + n * 4 + this.zone.id * 2));
   }
 
   forgetFragment(id: number) {
@@ -314,6 +341,7 @@ export class Renderer {
     if (!zone || !this.terrain || !this.asteroid || !this.hole || !this.bg) return;
     this.frame++;
     this.particles.update(dt);
+    this.planetR = s.sim.planetR();
     this.updateDrone(dt, s.time, 1 + s.sim.mods.extraDrones);
     const ctx = this.bctx;
     const cam = this.camera;
@@ -340,7 +368,7 @@ export class Renderer {
     // --- campos
     ctx.setTransform(z, 0, 0, z, tx, ty);
     for (const f of zone.fields) {
-      ctx.fillStyle = 'rgba(85,215,232,0.07)';
+      ctx.fillStyle = f.gravity ? 'rgba(255,179,75,0.07)' : 'rgba(85,215,232,0.07)';
       ctx.fillRect(f.x, f.y, f.w, f.h);
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -373,16 +401,31 @@ export class Renderer {
     ctx.drawImage(this.terrainLayer, tx - tx0, ty - ty0);
     ctx.globalAlpha = 1;
     for (const f of zone.fields) {
-      const b = cam.toBuffer(f.x + f.w / 2, f.y);
-      const arrow = f.ax < 0 ? '<' : f.ax > 0 ? '>' : '';
-      const label = `${arrow}${arrow} ${f.label.toUpperCase()}`;
-      drawPixelText(ctx, label, b.x - textWidth(label, ui) / 2, b.y + 4 * ui, 'rgba(160,240,232,0.95)', ui, '#03141a');
+      const b = cam.toBuffer(f.x + f.w / 2, f.h > f.w * 2 ? f.y + f.h - 30 : f.y);
+      const k = s.sim.fieldFactor(f);
+      const fx = f.ax * k;
+      const fy = f.ay * k + (f.gravity ? Config.gravity : 0);
+      const dir = Math.abs(fx) > Math.abs(fy) ? (fx < 0 ? '<<' : '>>') : fy < 0 ? 'SOBE' : 'DESCE';
+      const label = Math.abs(fx) > Math.abs(fy) ? `${dir} ${f.label.toUpperCase()}` : `${f.label.toUpperCase()} - ${dir}`;
+      drawPixelText(ctx, label, b.x - textWidth(label, ui) / 2, b.y + 4 * ui, f.gravity ? 'rgba(255,214,140,0.95)' : 'rgba(160,240,232,0.95)', ui, '#03141a');
+      if (f.period) {
+        // aviso de inversão: barra que esvazia até a próxima troca
+        const ph = ((((s.sim.time / f.period) * Math.PI * 2 + (f.phase ?? 0)) % Math.PI) + Math.PI) % Math.PI;
+        const left = 1 - ph / Math.PI;
+        const w = f.w * z * 0.6;
+        ctx.fillStyle = 'rgba(3,20,26,0.8)';
+        ctx.fillRect(Math.round(b.x - w / 2), Math.round(b.y + 12 * ui), Math.round(w), 2 * ui);
+        ctx.fillStyle = left < 0.2 ? '#ff6b6b' : '#7fe6e0';
+        ctx.fillRect(Math.round(b.x - w / 2), Math.round(b.y + 12 * ui), Math.round(w * left), 2 * ui);
+      }
     }
+    this.drawAnchors(s, tx, ty);
+    this.drawMovers(s, z, tx, ty, Math.max(0, 1 - col * 1.4));
 
     // --- buraco negro (cresce com a alimentação; enorme no colapso)
     const h = zone.blackHole;
     const growth = s.sim.holeGrowth;
-    const hs = (1 + 0.75 * growth) * (1 + col * col * 14);
+    const hs = (1 + 2.2 * growth) * (1 + col * col * 14);
     const hf = this.hole.frames[Math.floor(s.time * (10 + s.heat * 14)) % this.hole.frames.length];
     const hc = this.hole.core;
     const drawHole = (spr: Sprite) => {
@@ -406,18 +449,21 @@ export class Renderer {
     const a = zone.asteroid;
     const ast = this.asteroid;
     const jig = s.crack > 0.6 ? (Math.random() - 0.5) * 1.6 : 0;
-    ctx.setTransform(z, 0, 0, z, tx, ty);
+    // o planeta encolhe conforme é minerado
+    const pr = s.sim.planetR();
+    const ps = pr / a.r;
+    ctx.setTransform(z * ps, 0, 0, z * ps, Math.round(tx + z * (a.x + jig)), Math.round(ty + z * a.y));
     ctx.globalAlpha = Math.max(0, 1 - col * 1.6);
-    ctx.drawImage(ast.base.canvas, Math.round(a.x - ast.base.ox + jig), Math.round(a.y - ast.base.oy));
+    ctx.drawImage(ast.base.canvas, -ast.base.ox, -ast.base.oy);
     ctx.globalAlpha = Math.max(0, Math.min(1, 0.6 + s.crack * 0.4 + Math.sin(s.time * 1.7) * 0.12 + (s.hoverAsteroid ? 0.25 : 0)) - col);
-    ctx.drawImage(ast.glow.canvas, Math.round(a.x - ast.glow.ox + jig), Math.round(a.y - ast.glow.oy));
+    ctx.drawImage(ast.glow.canvas, -ast.glow.ox, -ast.glow.oy);
     ctx.globalAlpha = 1;
     // pedrinhas orbitando a fonte
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const ab = cam.toBuffer(a.x, a.y);
     for (let i = 0; i < 9; i++) {
       const ang = s.time * (0.35 + (i % 3) * 0.08) + i * 0.7;
-      const rr = (a.r + 8 + (i % 4) * 4) * z;
+      const rr = (pr + 8 + (i % 4) * 4) * z;
       const px = ab.x + Math.cos(ang) * rr;
       const py = ab.y + Math.sin(ang) * rr * 0.35;
       const front = Math.sin(ang) > 0;
@@ -426,7 +472,7 @@ export class Renderer {
     }
     if (this.frame % 5 === 0 && this.particles.pool.length < this.particles.cap * 0.5) {
       const ang = Math.random() * Math.PI * 2;
-      this.particles.spawn({ x: a.x + Math.cos(ang) * a.r * 0.8, y: a.y + Math.sin(ang) * a.r * 0.8, vx: (Math.random() - 0.5) * 6, vy: -8 - Math.random() * 8, life: 1.6, color: Math.random() < 0.5 ? '#ff8a2a' : PAL.core, size: 1, gravity: -4 });
+      this.particles.spawn({ x: a.x + Math.cos(ang) * pr * 0.8, y: a.y + Math.sin(ang) * pr * 0.8, vx: (Math.random() - 0.5) * 6, vy: -8 - Math.random() * 8, life: 1.6, color: Math.random() < 0.5 ? '#ff8a2a' : PAL.core, size: 1, gravity: -4 });
     }
 
     this.drawDrone(s, z, tx, ty, Math.max(0, 1 - col * 1.6));
@@ -606,6 +652,18 @@ export class Renderer {
       ctx.drawImage(frame.canvas, q.x - frame.ox, q.y - frame.oy);
       if (p.moon && !behind) ctx.drawImage(p.moon.canvas, Math.round(mx - p.moon.ox), Math.round(my - p.moon.oy));
     }
+    // Ônix, o buraco negro central, e o próximo planeta do contrato
+    if (this.onix) {
+      const q = this.par(zw * 0.78, zh * 0.12, 0.03, W, H);
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(this.onix.canvas, Math.round(q.x - this.onix.ox), Math.round(q.y - this.onix.oy));
+      ctx.globalAlpha = 1;
+    }
+    if (this.nextPlanet) {
+      const q = this.par(zw * 0.45, zh * 0.08, 0.045, W, H);
+      ctx.drawImage(this.nextPlanet.canvas, Math.round(q.x - this.nextPlanet.ox), Math.round(q.y - this.nextPlanet.oy));
+    }
+    this.drawTraffic(time, dt, W, H);
     for (const r of bg.farRocks) {
       r.x += r.vx * dt;
       r.y += r.vy * dt;
@@ -618,6 +676,59 @@ export class Renderer {
       ctx.drawImage(r.sprite.canvas, q.x - r.sprite.ox, q.y - r.sprite.oy);
     }
     this.drawMeteors(time, dt, W, H);
+  }
+
+  /** Cargueiros da Singularis cruzando o céu e cometas de cauda longa. */
+  private drawTraffic(time: number, dt: number, W: number, H: number) {
+    const ctx = this.bctx;
+    const ui = this.ui();
+    if (time > this.nextShip) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const scale = Math.random() < 0.3 ? 2 : 1;
+      this.ships.push({ x: dir > 0 ? -40 : W + 40, y: H * (0.08 + Math.random() * 0.5), vx: dir * (18 + Math.random() * 22) * scale, blink: Math.random() * 6, scale });
+      this.nextShip = time + 9 + Math.random() * 12;
+    }
+    const spr = cargoSprite();
+    for (const sh of this.ships) {
+      sh.x += sh.vx * dt;
+      const k = ui * sh.scale * 0.5;
+      const flip = sh.vx < 0 ? -1 : 1;
+      ctx.setTransform(k * flip, 0, 0, k, Math.round(sh.x), Math.round(sh.y));
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // propulsor e luz de navegação
+      ctx.fillStyle = '#55d7e8';
+      ctx.fillRect(Math.round(sh.x - flip * 10 * k), Math.round(sh.y), Math.max(1, Math.round(k)), Math.max(1, Math.round(k)));
+      if (Math.floor(time * 2 + sh.blink) % 3 === 0) {
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillRect(Math.round(sh.x + flip * 6 * k), Math.round(sh.y - 3 * k), ui, ui);
+      }
+      ctx.globalAlpha = 1;
+    }
+    this.ships = this.ships.filter((sh) => sh.x > -80 && sh.x < W + 80);
+    if (time > this.nextComet) {
+      const fromLeft = Math.random() < 0.5;
+      this.comets.push({ x: fromLeft ? -30 : W + 30, y: H * Math.random() * 0.35, vx: (fromLeft ? 1 : -1) * (40 + Math.random() * 30), vy: 10 + Math.random() * 14, life: 40 });
+      this.nextComet = time + 25 + Math.random() * 25;
+    }
+    for (const c of this.comets) {
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      c.life -= dt;
+      const l = Math.hypot(c.vx, c.vy);
+      const dx = c.vx / l;
+      const dy = c.vy / l;
+      for (let i = 60; i >= 0; i--) {
+        const t = i / 60;
+        ctx.globalAlpha = (1 - t) * 0.7;
+        ctx.fillStyle = t < 0.15 ? '#ffffff' : t < 0.5 ? '#bff6ff' : '#55a8e8';
+        const w = Math.max(1, Math.round((3 - t * 2.5) * ui));
+        ctx.fillRect(Math.round(c.x - dx * i * ui * 2 + Math.sin(i * 0.4 + time) * t * 3), Math.round(c.y - dy * i * ui * 2), w, w);
+      }
+      ctx.globalAlpha = 1;
+    }
+    this.comets = this.comets.filter((c) => c.life > 0);
   }
 
   /** Estrelas cadentes rápidas e meteoros grandes e lentos com cauda de fogo. */
@@ -689,7 +800,7 @@ export class Renderer {
     };
     this.additive(() => {
       const a = zone.asteroid;
-      put(a.x, a.y, '#ff7a2a', a.r * 4, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
+      put(a.x, a.y, PLANET_GLOW[zone.theme] ?? '#ff7a2a', s.sim.planetR() * 3.2, 0.35 + s.crack * 0.3 + Math.sin(s.time * 1.7) * 0.05);
       const h = zone.blackHole;
       put(h.x, h.y, '#7a30c8', (h.absorbRadius + 42) * 3.4 * holeScale, 0.38);
       put(h.x, h.y, '#ff7a2a', (h.absorbRadius + 30) * 2.6 * holeScale, 0.12 + s.heat * 0.45);
@@ -707,15 +818,59 @@ export class Renderer {
     });
   }
 
+  /** Pontos de ancoragem: anel tracejado e balizas piscando (mais visíveis no modo construir). */
+  private drawAnchors(s: RenderState, tx: number, ty: number) {
+    const anchors = this.zone!.anchors ?? [];
+    if (!anchors.length) return;
+    const ctx = this.bctx;
+    const z = this.camera.zoom;
+    const ui = this.ui();
+    for (const an of anchors) {
+      const cx = tx + an.x * z;
+      const cy = ty + an.y * z;
+      this.ringPx(cx, cy, an.r * z, s.buildMode ? 'rgba(110,231,160,0.85)' : 'rgba(110,231,160,0.28)', Math.floor(an.r * z * 0.7), true);
+      for (let k = 0; k < 4; k++) {
+        const ang = (k / 4) * Math.PI * 2 + Math.PI / 4;
+        const on = Math.floor(s.time * 2 + k) % 4 === 0;
+        ctx.fillStyle = on ? '#e8fff0' : '#6ee7a0';
+        ctx.fillRect(Math.round(cx + Math.cos(ang) * an.r * z) - ui, Math.round(cy + Math.sin(ang) * an.r * z) - ui, ui * 2, ui * 2);
+      }
+    }
+  }
+
+  /** Obstáculos em movimento (rochas em órbita, lâminas giratórias, anéis). */
+  private drawMovers(s: RenderState, z: number, tx: number, ty: number, alpha: number) {
+    const ms = this.zone!.movers ?? [];
+    if (!ms.length || alpha <= 0) return;
+    const ctx = this.bctx;
+    ctx.globalAlpha = alpha;
+    ms.forEach((m, i) => {
+      const spr = this.moverSprites[i];
+      if (!spr) return;
+      const p = s.sim.moverPose(m);
+      const c = Math.cos(p.angle);
+      const sn = Math.sin(p.angle);
+      ctx.setTransform(z * c, z * sn, -z * sn, z * c, tx + z * p.x, ty + z * p.y);
+      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    // trilha de órbita discreta
+    for (const m of ms) if (m.orbit > 0) this.ringPx(tx + m.cx * z, ty + m.cy * z, m.orbit * z, 'rgba(255,180,140,0.18)', Math.floor(m.orbit * z * 0.5), true);
+  }
+
   private drawAmbientFields(s: RenderState, tx: number, ty: number) {
     const ctx = this.bctx;
     const z = this.camera.zoom;
     for (const f of this.zone!.fields) {
-      const len = Math.hypot(f.ax, f.ay) || 1;
-      const dx = f.ax / len;
-      const dy = f.ay / len;
+      const k = s.sim.fieldFactor(f);
+      const vx = f.ax * k;
+      const vy = f.ay * k + (f.gravity ? Config.gravity : 0);
+      const len = Math.hypot(vx, vy) || 1;
+      const dx = vx / len;
+      const dy = vy / len;
+      ctx.fillStyle = f.gravity ? 'rgba(255,214,140,0.8)' : 'rgba(127,230,224,0.8)';
       const n = Math.max(10, Math.floor((f.w * f.h) / 900));
-      ctx.fillStyle = 'rgba(127,230,224,0.8)';
       for (let i = 0; i < n; i++) {
         const seedX = (i * 73.13) % 1;
         const seedY = (i * 37.71) % 1;
@@ -941,7 +1096,7 @@ export class Renderer {
       });
     }
     this.drones[idx].target = ang;
-    this.shots.push({ x: a.x + Math.cos(ang) * a.r * 0.92, y: a.y + Math.sin(ang) * a.r * 0.92, life: auto ? 0.16 : 0.22, max: auto ? 0.16 : 0.22, auto, drone: idx });
+    this.shots.push({ x: a.x + Math.cos(ang) * this.planetR * 0.95, y: a.y + Math.sin(ang) * this.planetR * 0.95, life: auto ? 0.16 : 0.22, max: auto ? 0.16 : 0.22, auto, drone: idx });
     if (this.shots.length > 8) this.shots.shift();
   }
 
@@ -966,7 +1121,7 @@ export class Renderer {
   private dronePos(k: number): Vec {
     const a = this.zone!.asteroid;
     const d = this.drones[k];
-    const r = a.r + 24 + (k % 2) * 7;
+    const r = this.planetR + 24 + (k % 2) * 7;
     return { x: a.x + Math.cos(d.ang) * r, y: a.y + Math.sin(d.ang) * r + d.bob };
   }
 

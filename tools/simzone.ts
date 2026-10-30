@@ -57,6 +57,8 @@ const a = zone.asteroid;
 svg += `<circle cx="${a.x}" cy="${a.y}" r="${a.r}" fill="#7a5a4a"/>`;
 const h = zone.blackHole;
 svg += `<circle cx="${h.x}" cy="${h.y}" r="${h.attractRadius}" fill="none" stroke="#9D68E8" stroke-dasharray="4 4"/><circle cx="${h.x}" cy="${h.y}" r="${h.absorbRadius}" fill="#000" stroke="#FFB34B"/>`;
+for (const an of zone.anchors ?? []) svg += `<circle cx="${an.x}" cy="${an.y}" r="${an.r}" fill="#6ee7a011" stroke="#6ee7a0" stroke-dasharray="3 3"/>`;
+for (const m of zone.movers ?? []) for (let k = 0; k < 6; k++) { const pose = sim.moverPose(m, k * 0.6); svg += `<polygon points="${m.poly.map(([x, y]) => `${(pose.x + x * Math.cos(pose.angle) - y * Math.sin(pose.angle)).toFixed(1)},${(pose.y + x * Math.sin(pose.angle) + y * Math.cos(pose.angle)).toFixed(1)}`).join(' ')}" fill="#a0607044" stroke="#e08a8a"/>`; }
 for (const f of zone.fields) svg += `<rect x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" fill="#55D7E822" stroke="#55D7E8"/>`;
 for (const r of zone.regions) svg += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="#FFE08A" stroke-dasharray="2 4"/>`;
 for (const d of sim.devices.values()) {

@@ -2,11 +2,11 @@
  "id": 2,
  "key": "orion",
  "name": "Fenda de Órion",
- "subtitle": "Abismo e câmara elevada",
+ "subtitle": "Ancoragens: só se constrói nos pontos marcados",
  "theme": "orion",
- "intro": "Um abismo e um paredão. Eleve ou lance os fragmentos.",
- "width": 1120,
- "height": 640,
+ "intro": "Só dá para construir nas ancoragens. O buraco negro está no alto, atrás da coluna.",
+ "width": 1280,
+ "height": 720,
  "gravity": {
   "x": 0,
   "y": 1
@@ -14,196 +14,270 @@
  "terrain": [
   [
    [
-    0,
-    250
+    363.3,
+    690.3
    ],
    [
-    24,
-    250
+    370.1,
+    678.0
    ],
    [
-    24,
-    455
+    413.9,
+    702.0
    ],
    [
-    0,
-    455
+    407.2,
+    714.3
    ]
   ],
   [
    [
-    0,
-    455
+    303.0,
+    634
    ],
    [
-    220,
-    455
+    317.0,
+    634
    ],
    [
-    220,
-    640
+    370.1,
+    678.0
    ],
    [
-    0,
-    640
+    360.3,
+    687.8
    ]
   ],
   [
    [
-    220,
-    455
+    413.9,
+    702.0
    ],
    [
-    400,
-    515
+    467.0,
+    634
    ],
    [
-    400,
-    640
+    481.0,
+    634
    ],
    [
-    220,
-    640
+    423.7,
+    711.8
    ]
   ],
   [
    [
-    520,
-    0
+    621.7,
+    564.6
    ],
    [
-    610,
-    0
+    626.5,
+    551.4
    ],
    [
-    610,
-    200
+    673.5,
+    568.6
    ],
    [
-    520,
-    200
+    668.7,
+    581.7
    ]
   ],
   [
    [
-    545,
-    200
+    561.0,
+    504
    ],
    [
-    585,
-    200
+    575.0,
+    504
    ],
    [
-    585,
-    300
+    626.5,
+    551.4
    ],
    [
-    545,
-    300
+    616.7,
+    561.2
    ]
   ],
   [
    [
-    655,
-    585
+    673.5,
+    568.6
    ],
    [
-    820,
-    585
+    725.0,
+    504
    ],
    [
-    820,
-    640
+    739.0,
+    504
    ],
    [
-    655,
-    640
+    683.3,
+    578.4
    ]
   ],
   [
    [
-    820,
-    280
+    851.3,
+    360.3
    ],
    [
-    860,
-    280
+    858.1,
+    348.0
    ],
    [
-    860,
-    640
+    901.9,
+    372.0
    ],
    [
-    820,
-    640
+    895.2,
+    384.3
    ]
   ],
   [
    [
-    860,
-    430
+    791.0,
+    304
    ],
    [
-    1120,
-    430
+    805.0,
+    304
    ],
    [
-    1120,
-    640
+    858.1,
+    348.0
    ],
    [
-    860,
-    640
+    848.3,
+    357.8
    ]
   ],
   [
    [
-    1090,
-    200
+    901.9,
+    372.0
    ],
    [
-    1120,
-    200
+    955.0,
+    304
    ],
    [
-    1120,
-    430
+    969.0,
+    304
    ],
    [
-    1090,
-    430
+    911.7,
+    381.8
    ]
   ],
   [
    [
-    900,
-    0
+    989.2,
+    269.0
    ],
    [
-    1120,
-    0
+    1045.2,
+    271.3
    ],
    [
-    1120,
-    200
+    1030.8,
+    631.0
    ],
    [
-    900,
-    200
+    974.8,
+    628.7
+   ]
+  ],
+  [
+   [
+    569.3,
+    80.5
+   ],
+   [
+    988.7,
+    59.5
+   ],
+   [
+    990.7,
+    99.5
+   ],
+   [
+    571.3,
+    120.5
+   ]
+  ],
+  [
+   [
+    1090.1,
+    579.1
+   ],
+   [
+    1111.8,
+    557.4
+   ],
+   [
+    1151.5,
+    553.7
+   ],
+   [
+    1181.4,
+    569.0
+   ],
+   [
+    1188.7,
+    595.2
+   ],
+   [
+    1150.5,
+    612.2
+   ],
+   [
+    1105.8,
+    604.1
+   ]
+  ],
+  [
+   [
+    521.0,
+    293.9
+   ],
+   [
+    548.2,
+    273.6
+   ],
+   [
+    585.7,
+    280.5
+   ],
+   [
+    594.3,
+    305.4
+   ],
+   [
+    571.1,
+    324.9
+   ],
+   [
+    533.5,
+    320.2
    ]
   ]
  ],
  "asteroid": {
-  "x": 170,
-  "y": 400,
-  "r": 42
+  "x": 110,
+  "y": 600,
+  "r": 182
  },
  "blackHole": {
-  "x": 985,
-  "y": 388,
+  "x": 1150,
+  "y": 190,
   "attractRadius": 90,
-  "absorbRadius": 15,
-  "strength": 980
+  "absorbRadius": 14,
+  "strength": 1000
  },
  "noBuild": [],
  "fields": [],
@@ -242,11 +316,11 @@
   {
    "id": "z2-eng",
    "tier": "engineering",
-   "title": "Eficiência de 40% (janela de 40 fragmentos)",
+   "title": "Eficiência de 30% (janela de 40 fragmentos)",
    "reqs": [
     {
      "kind": "efficiency",
-     "pct": 40
+     "pct": 30
     }
    ],
    "reward": 180
@@ -277,102 +351,117 @@
   }
  ],
  "hints": [
-  "O canhão de massa segura a pedra um instante e dispara com a mesma velocidade para qualquer massa.",
-  "Uma viga receptora depois do arco evita que o fragmento quique de volta.",
-  "Propulsores em sequência vencem um desnível aos poucos."
+  "Peças só podem ser presas nas ancoragens (círculos verdes).",
+  "A placa de pulso não ergue pedras pesadas: na subida mais alta, use o canhão de massa.",
+  "Da cratera alta, mire por cima da coluna."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Catapulta na borda com anteparo e viga receptora na câmara",
+   "label": "Placa de pulso, canhão de massa e placa de pulso subindo de cratera em cratera",
    "aim": {
-    "x": 260,
-    "y": 340
+    "x": 360,
+    "y": 540
    },
-   "expectRate": 0.2,
+   "pace": 60,
+   "expectRate": 0.18,
    "devices": [
     {
-     "type": "launcher",
-     "x": 448.9,
-     "y": 554.4,
-     "angle": 0.453,
+     "type": "spring",
+     "x": 397.5,
+     "y": 685.7,
+     "angle": 0.429,
      "params": {
-      "power": 12.1
+      "power": 9.58
      }
     },
     {
-     "type": "plank",
-     "x": 510,
-     "y": 542.7,
-     "angle": 1.481
+     "type": "launcher",
+     "x": 655.5,
+     "y": 548.8,
+     "angle": 0.255,
+     "params": {
+      "power": 11.99
+     }
     },
     {
-     "type": "plank",
-     "x": 909.9,
-     "y": 367,
-     "angle": 0.016
+     "type": "spring",
+     "x": 881.8,
+     "y": 349.7,
+     "angle": 0.533,
+     "params": {
+      "power": 9.47
+     }
     }
    ]
   },
   {
    "id": "B",
-   "label": "Ponte de vigas, acelerador e canhão de massa na plataforma",
+   "label": "Três placas de pulso (só as leves sobem até o fim)",
    "aim": {
-    "x": 260,
-    "y": 340
+    "x": 360,
+    "y": 540
    },
-   "expectRate": 0.12,
+   "pace": 60,
+   "expectRate": 0.02,
    "devices": [
     {
-     "type": "plank",
-     "x": 433.7,
-     "y": 524,
-     "angle": 0.126
-    },
-    {
-     "type": "plank",
-     "x": 499.2,
-     "y": 532.3,
-     "angle": 0.126
-    },
-    {
-     "type": "plank",
-     "x": 564.7,
-     "y": 540.6,
-     "angle": 0.126
-    },
-    {
-     "type": "booster",
-     "x": 618.9,
-     "y": 554,
-     "angle": -0.46,
+     "type": "spring",
+     "x": 395.8,
+     "y": 684,
+     "angle": 0.51,
      "params": {
-      "power": 7
+      "power": 9.35
      }
     },
     {
-     "type": "launcher",
-     "x": 767.7,
-     "y": 571,
-     "angle": 0.09,
+     "type": "spring",
+     "x": 656,
+     "y": 552.1,
+     "angle": 0.348,
      "params": {
-      "power": 12.12
+      "power": 9.54
      }
     },
     {
-     "type": "plank",
-     "x": 892.2,
-     "y": 386,
-     "angle": 0.32
+     "type": "spring",
+     "x": 878.9,
+     "y": 352.9,
+     "angle": 0.51,
+     "params": {
+      "power": 8.63
+     }
     }
    ]
-  },
-  {
-   "id": "C",
-   "label": "Arrasto manual até a borda superior do paredão e ricochete na câmara",
-   "manual": true,
-   "devices": []
   }
  ],
- "growthTarget": 1600
+ "growthTarget": 1200,
+ "anchors": [
+  {
+   "x": 397.8,
+   "y": 679.5,
+   "r": 34
+  },
+  {
+   "x": 654.1,
+   "y": 548.7,
+   "r": 34
+  },
+  {
+   "x": 885.8,
+   "y": 349.5,
+   "r": 34
+  },
+  {
+   "x": 760,
+   "y": 250,
+   "r": 38
+  },
+  {
+   "x": 1140,
+   "y": 490,
+   "r": 40
+  }
+ ],
+ "movers": []
 }

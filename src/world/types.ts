@@ -14,6 +14,35 @@ export interface AmbientFieldData {
   /** aceleração em px/s² */
   ax: number;
   ay: number;
+  /** se definido, o campo inverte de sentido a cada meio período (s) */
+  period?: number;
+  phase?: number;
+  /** true = gravidade local (age igual em qualquer massa); senão, vento (leves sentem mais) */
+  gravity?: boolean;
+}
+
+/** Ponto de ancoragem: peças só podem ser construídas dentro destes círculos. */
+export interface AnchorData {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Obstáculo em movimento: polígono convexo que orbita um centro e/ou gira. */
+export interface MoverData {
+  id: string;
+  kind: 'rock' | 'hull' | 'ring';
+  /** polígono convexo em coordenadas locais */
+  poly: [number, number][];
+  cx: number;
+  cy: number;
+  /** raio da órbita (0 = gira no lugar) */
+  orbit: number;
+  /** rad/s da órbita */
+  speed: number;
+  phase: number;
+  /** rad/s de giro próprio */
+  spin?: number;
 }
 
 export interface RegionData {
@@ -68,6 +97,11 @@ export interface ZoneData {
   asteroid: { x: number; y: number; r: number };
   blackHole: { x: number; y: number; attractRadius: number; absorbRadius: number; strength: number };
   noBuild: { x: number; y: number; r: number }[];
+  /** se houver, só se constrói dentro das ancoragens */
+  anchors?: AnchorData[];
+  movers?: MoverData[];
+  /** fração do raio que o planeta perde até ser totalmente consumido (padrão 0.6) */
+  planetShrink?: number;
   fields: AmbientFieldData[];
   regions: RegionData[];
   /** ferramentas que passam a existir a partir desta zona */

@@ -46,7 +46,7 @@ export const FAN_WIDTH = 36;
 export const LIFT_HEIGHT = 240;
 export const LIFT_WIDTH = 30;
 export const FIELD_RADIUS = 110;
-export const LAUNCHER_CUP = { x0: -10, x1: 10, y0: -9, y1: 6 };
+export const LAUNCHER_CUP = { x0: -17, x1: 17, y0: -15, y1: 6 };
 export const SENSOR_SIZE = 28;
 export const ARM_LENGTH = 58;
 
@@ -141,7 +141,7 @@ export const DEVICES: Record<DeviceType, DeviceDef> = {
     howTo: 'Faça as pedras caírem no berço. É a única peça que arremessa longe pedras densas e metálicas.',
     limit: 'Uma pedra por vez, com recarga.',
     cost: 110,
-    solids: () => [rectPoly(32, 5, 0, 8.5), rectPoly(5, 12, -13.5, 1), rectPoly(5, 16, 13.5, -1)],
+    solids: () => [rectPoly(32, 5, 0, 8.5), rectPoly(5, 7, -13.5, 3.5), rectPoly(5, 9, 13.5, 2.5)],
     friction: 0.02,
     restitution: 0.02,
     params: [{ key: 'power', label: 'Potência', min: 6, max: 16, step: 0.25, def: 11 }],

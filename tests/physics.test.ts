@@ -179,7 +179,10 @@ describe('buraco negro', () => {
 describe('peças', () => {
   it('não podem ser colocadas dentro da rocha nem tapar o buraco negro', () => {
     const sim = new Sim(loadZone(1));
-    expect(sim.validatePlacement('plank', 470, 200, 0, {}).ok).toBe(false);
+    const t0 = sim.zone.terrain[0];
+    const cx = t0.reduce((a, q) => a + q[0], 0) / t0.length;
+    const cy = t0.reduce((a, q) => a + q[1], 0) / t0.length;
+    expect(sim.validatePlacement('plank', cx, cy, 0, {}).ok).toBe(false);
     const h = sim.zone.blackHole;
     expect(sim.validatePlacement('plank', h.x, h.y, 0, {}).ok).toBe(false);
     expect(sim.validatePlacement('plank', 470, 420, 0.2, {}).ok).toBe(true);

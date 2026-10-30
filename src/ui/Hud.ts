@@ -92,7 +92,7 @@ export class Hud {
       'div',
       { class: 'hud-cam' },
       btn('overview', 'Visão geral (F)', () => api.overview()),
-      btn('home', 'Ir até o asteroide (H)', () => api.home()),
+      btn('home', 'Ir até o planeta (H)', () => api.home()),
       btn('undo', 'Desfazer construção (Ctrl+Z)', () => api.undo()),
       btn('stats', 'Estatísticas', () => this.onStats()),
       btn('eye', 'Esconder interface (U)', () => this.toggleHidden()),

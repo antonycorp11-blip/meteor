@@ -2,11 +2,11 @@
  "id": 5,
  "key": "catedral",
  "name": "Catedral do Horizonte",
- "subtitle": "Três muralhas dos Construtores, cada uma com seu bolsão",
+ "subtitle": "Regiões onde a gravidade aponta para cima e para o lado",
  "theme": "cathedral",
- "intro": "Três muralhas antigas. Cada bolsão precisa do seu próprio arremesso.",
- "width": 1600,
- "height": 880,
+ "intro": "Aqui a gravidade muda de direção. Use-a a seu favor.",
+ "width": 1520,
+ "height": 860,
  "gravity": {
   "x": 0,
   "y": 1
@@ -14,325 +14,242 @@
  "terrain": [
   [
    [
-    0,
-    100
+    391.4,
+    791.7
    ],
    [
-    26,
-    100
+    397.5,
+    779.1
    ],
    [
-    26,
-    300
+    442.5,
+    800.9
    ],
    [
-    0,
-    300
+    436.4,
+    813.5
    ]
   ],
   [
    [
-    0,
-    300
+    331.0,
+    734
    ],
    [
-    190,
-    300
+    345.0,
+    734
    ],
    [
-    190,
-    880
+    397.5,
+    779.1
    ],
    [
-    0,
-    880
+    387.7,
+    788.9
    ]
   ],
   [
    [
-    190,
-    300
+    442.5,
+    800.9
    ],
    [
-    320,
-    312
+    495.0,
+    734
    ],
    [
-    320,
-    880
+    509.0,
+    734
    ],
    [
-    190,
-    880
+    452.3,
+    810.7
    ]
   ],
   [
    [
-    320,
-    580
+    460.0,
+    55.0
    ],
    [
-    520,
-    552
+    820.0,
+    55.0
    ],
    [
-    520,
-    880
+    820.0,
+    85.0
    ],
    [
-    320,
-    880
+    460.0,
+    85.0
    ]
   ],
   [
    [
-    520,
-    345
+    971.3,
+    600.3
    ],
    [
-    560,
-    345
+    978.1,
+    588.0
    ],
    [
-    560,
-    880
+    1021.9,
+    612.0
    ],
    [
-    520,
-    880
+    1015.2,
+    624.3
    ]
   ],
   [
    [
-    560,
-    440
+    911.0,
+    544
    ],
    [
-    780,
-    580
+    925.0,
+    544
    ],
    [
-    780,
-    880
+    978.1,
+    588.0
    ],
    [
-    560,
-    880
+    968.3,
+    597.8
    ]
   ],
   [
    [
-    780,
-    665
+    1021.9,
+    612.0
    ],
    [
-    920,
-    640
+    1075.0,
+    544
    ],
    [
-    920,
-    880
+    1089.0,
+    544
    ],
    [
-    780,
-    880
+    1031.7,
+    621.8
    ]
   ],
   [
    [
-    920,
-    430
+    1135.0,
+    230.0
    ],
    [
-    960,
-    430
+    1165.0,
+    230.0
    ],
    [
-    960,
-    880
+    1165.0,
+    530.0
    ],
    [
-    920,
-    880
+    1135.0,
+    530.0
    ]
   ],
   [
    [
-    960,
-    500
+    1344.6,
+    433.3
    ],
    [
-    1180,
-    590
+    1355.9,
+    409.8
    ],
    [
-    1180,
-    880
+    1395.4,
+    399.7
    ],
    [
-    960,
-    880
+    1435.1,
+    412.7
+   ],
+   [
+    1436.3,
+    439.5
+   ],
+   [
+    1405.6,
+    456.2
+   ],
+   [
+    1366.2,
+    453.0
    ]
   ],
   [
    [
-    1180,
-    735
+    784.4,
+    355.0
    ],
    [
-    1300,
-    712
+    808.5,
+    336.0
    ],
    [
-    1300,
-    880
+    844.8,
+    340.3
    ],
    [
-    1180,
-    880
-   ]
-  ],
-  [
-   [
-    1300,
-    500
+    861.5,
+    365.9
    ],
    [
-    1340,
-    500
+    832.7,
+    386.6
    ],
    [
-    1340,
-    880
-   ],
-   [
-    1300,
-    880
-   ]
-  ],
-  [
-   [
-    1340,
-    800
-   ],
-   [
-    1450,
-    830
-   ],
-   [
-    1450,
-    880
-   ],
-   [
-    1340,
-    880
-   ]
-  ],
-  [
-   [
-    1450,
-    830
-   ],
-   [
-    1560,
-    800
-   ],
-   [
-    1560,
-    880
-   ],
-   [
-    1450,
-    880
-   ]
-  ],
-  [
-   [
-    1560,
-    0
-   ],
-   [
-    1600,
-    0
-   ],
-   [
-    1600,
-    880
-   ],
-   [
-    1560,
-    880
-   ]
-  ],
-  [
-   [
-    640,
-    0
-   ],
-   [
-    700,
-    0
-   ],
-   [
-    700,
-    110
-   ],
-   [
-    640,
-    110
-   ]
-  ],
-  [
-   [
-    1060,
-    0
-   ],
-   [
-    1110,
-    0
-   ],
-   [
-    1110,
-    170
-   ],
-   [
-    1060,
-    170
-   ]
-  ],
-  [
-   [
-    1300,
-    0
-   ],
-   [
-    1560,
-    0
-   ],
-   [
-    1560,
-    230
-   ],
-   [
-    1300,
-    230
+    795.0,
+    379.8
    ]
   ]
  ],
  "asteroid": {
-  "x": 150,
-  "y": 230,
-  "r": 44
+  "x": 80,
+  "y": 720,
+  "r": 210
  },
  "blackHole": {
-  "x": 1450,
-  "y": 772,
+  "x": 1300,
+  "y": 230,
   "attractRadius": 95,
   "absorbRadius": 15,
   "strength": 1000
  },
  "noBuild": [],
- "fields": [],
+ "fields": [
+  {
+   "id": "g1",
+   "label": "Gravidade invertida",
+   "x": 560,
+   "y": 100,
+   "w": 140,
+   "h": 640,
+   "ax": 0,
+   "ay": -1120,
+   "gravity": true
+  },
+  {
+   "id": "g2",
+   "label": "Gravidade lateral",
+   "x": 700,
+   "y": 100,
+   "w": 340,
+   "h": 120,
+   "ax": 760,
+   "ay": -560,
+   "gravity": true
+  }
+ ],
  "regions": [],
  "tools": [
   "arm",
@@ -387,11 +304,11 @@
   {
    "id": "z5-eng",
    "tier": "engineering",
-   "title": "70% de eficiência (janela de 75), 100 entregas automáticas e 90 s estáveis",
+   "title": "25% de eficiência (janela de 75), 100 entregas automáticas e 90 s estáveis",
    "reqs": [
     {
      "kind": "efficiency",
-     "pct": 70
+     "pct": 25
     },
     {
      "kind": "autoDeliveries",
@@ -421,12 +338,12 @@
   {
    "id": "z5-x2",
    "tier": "extra",
-   "title": "70% de eficiência usando no máximo 12 peças",
+   "title": "30% de eficiência usando no máximo 12 peças",
    "reqs": [
     {
      "kind": "maxDevicesEff",
      "maxDevices": 12,
-     "pct": 70
+     "pct": 30
     }
    ],
    "reward": 300
@@ -446,95 +363,128 @@
   }
  ],
  "hints": [
-  "Cada muralha prende as pedras num bolsão: sem um arremesso em cada etapa, nada passa.",
-  "Pedras caem do platô no primeiro bolsão: o canhão no meio dele tem espaço para mirar por cima da muralha.",
-  "Na última muralha uma placa de pulso basta para as pedras leves; as pesadas precisam do canhão."
+  "Na coluna dourada, tudo cai para cima.",
+  "No alto, a faixa lateral leva as pedras para a direita.",
+  "Uma lâmina gira na frente do buraco negro: chegue com força."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Três canhões de massa, um em cada bolsão entre as muralhas",
+   "label": "Placa de pulso para dentro da coluna de gravidade invertida e canhão na cratera de chegada",
    "aim": {
-    "x": 250,
-    "y": 200
+    "x": 340,
+    "y": 640
    },
-   "pace": 90,
-   "expectRate": 0.1,
+   "pace": 60,
+   "expectRate": 0.06,
    "devices": [
     {
-     "type": "launcher",
-     "x": 427.1,
-     "y": 550,
-     "angle": 0.128,
+     "type": "spring",
+     "x": 426.6,
+     "y": 779.6,
+     "angle": 0.335,
      "params": {
-      "power": 15.95
+      "power": 9.41
      }
     },
     {
      "type": "launcher",
-     "x": 838.2,
-     "y": 634.9,
-     "angle": 0.137,
+     "x": 1004.7,
+     "y": 584.7,
+     "angle": 0.541,
      "params": {
-      "power": 13.34
-     }
-    },
-    {
-     "type": "launcher",
-     "x": 1269.6,
-     "y": 700,
-     "angle": 0.053,
-     "params": {
-      "power": 14.47
+      "power": 8.7
      }
     }
    ]
   },
   {
    "id": "B",
-   "label": "Dois canhões e uma placa de pulso na última muralha (só as leves passam)",
+   "label": "Duas placas de pulso usando as duas regiões de gravidade",
    "aim": {
-    "x": 250,
-    "y": 200
+    "x": 340,
+    "y": 640
    },
-   "pace": 90,
-   "expectRate": 0.1,
+   "pace": 60,
+   "expectRate": 0.02,
    "devices": [
     {
-     "type": "launcher",
-     "x": 427.1,
-     "y": 550,
-     "angle": 0.128,
+     "type": "spring",
+     "x": 418.6,
+     "y": 781.9,
+     "angle": 0.391,
      "params": {
-      "power": 15.95
-     }
-    },
-    {
-     "type": "launcher",
-     "x": 838.2,
-     "y": 634.9,
-     "angle": 0.137,
-     "params": {
-      "power": 13.34
+      "power": 9.22
      }
     },
     {
      "type": "spring",
-     "x": 1223.6,
-     "y": 716.7,
-     "angle": 0.119,
+     "x": 1000.9,
+     "y": 594.5,
+     "angle": 0.471,
      "params": {
-      "power": 9.51
+      "power": 7.47
      }
     }
    ]
-  },
-  {
-   "id": "C",
-   "label": "Manual: feixe trator levando pedras por cima das muralhas",
-   "manual": true,
-   "devices": []
   }
  ],
- "growthTarget": 13000
+ "growthTarget": 5000,
+ "anchors": [
+  {
+   "x": 425.2,
+   "y": 779.2,
+   "r": 34
+  },
+  {
+   "x": 640,
+   "y": 125,
+   "r": 50
+  },
+  {
+   "x": 820,
+   "y": 270,
+   "r": 46
+  },
+  {
+   "x": 1005.8,
+   "y": 589.5,
+   "r": 34
+  },
+  {
+   "x": 1240,
+   "y": 430,
+   "r": 46
+  }
+ ],
+ "movers": [
+  {
+   "id": "sentinela",
+   "kind": "ring",
+   "poly": [
+    [
+     -60,
+     -10
+    ],
+    [
+     60,
+     -10
+    ],
+    [
+     60,
+     10
+    ],
+    [
+     -60,
+     10
+    ]
+   ],
+   "cx": 1300,
+   "cy": 230,
+   "orbit": 0,
+   "speed": 0,
+   "phase": 0,
+   "spin": -0.5
+  }
+ ]
 }

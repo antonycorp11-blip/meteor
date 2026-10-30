@@ -30,7 +30,7 @@ import {
   type FragmentTypeId,
 } from '../physics/fragmentTypes';
 import { terrainPolys } from '../world/Terrain';
-import type { ZoneData } from '../world/types';
+import type { AmbientFieldData, MoverData, ZoneData } from '../world/types';
 import { DEFAULT_MODS, type SimMods } from './mods';
 
 const { Engine, Body, Composite, Events, Sleeping, Vertices, Bodies } = Matter;
@@ -133,6 +133,8 @@ export class Sim {
   /** direção em que a mineração automática bate (último clique manual) */
   mineAim: Vec;
   private autoMineTimer = 0;
+  private bodyR = 0;
+  moverBodies: Matter.Body[] = [];
   private queue: (() => void)[] = [];
   private g: number;
 
@@ -167,6 +169,16 @@ export class Sim {
       plugin: { kind: 'asteroid' } satisfies Plugin,
     });
     Composite.add(this.engine.world, this.asteroidBody);
+    this.bodyR = a.r;
+    for (const m of zone.movers ?? []) {
+      const poly = m.poly.map(([x, y]) => ({ x, y }));
+      const body = this.staticBody(poly, { kind: 'terrain' }, 0.05, 0.15);
+      // o pivô do obstáculo é a origem local do polígono
+      Body.setCentre(body, { x: 0, y: 0 }, false);
+      this.moverBodies.push(body);
+    }
+    if (this.moverBodies.length) Composite.add(this.engine.world, this.moverBodies);
+    this.updateMovers();
 
     Events.on(this.engine, 'collisionStart', (e) => this.onCollision(e.pairs, true));
     Events.on(this.engine, 'collisionActive', (e) => this.onCollision(e.pairs, false));
@@ -185,15 +197,53 @@ export class Sim {
   }
 
   holeAbsorb() {
-    return this.zone.blackHole.absorbRadius * (1 + 0.7 * this.holeGrowth);
+    return this.zone.blackHole.absorbRadius * (1 + 2.2 * this.holeGrowth);
   }
 
   holeAttract() {
-    return this.zone.blackHole.attractRadius * (1 + 0.45 * this.holeGrowth) * this.mods.holeRadiusMul;
+    return this.zone.blackHole.attractRadius * (1 + 0.8 * this.holeGrowth) * this.mods.holeRadiusMul;
   }
 
   holeStrength() {
-    return this.zone.blackHole.strength * (1 + 0.35 * this.holeGrowth);
+    return this.zone.blackHole.strength * (1 + 0.5 * this.holeGrowth);
+  }
+
+  /** Raio atual do planeta: encolhe conforme a semente cresce. */
+  planetR() {
+    const a = this.zone.asteroid;
+    return a.r * (1 - (this.zone.planetShrink ?? 0.6) * this.holeGrowth);
+  }
+
+  /** Mantém o corpo físico do planeta do tamanho do desenho. */
+  private syncPlanet() {
+    const r = this.planetR();
+    if (Math.abs(r - this.bodyR) < 0.5) return;
+    Body.scale(this.asteroidBody, r / this.bodyR, r / this.bodyR);
+    this.bodyR = r;
+  }
+
+  /** Fator de um campo ambiental agora (−1..1 para campos que invertem). */
+  fieldFactor(af: AmbientFieldData) {
+    if (!af.period) return 1;
+    const v = Math.sin((this.time / af.period) * Math.PI * 2 + (af.phase ?? 0));
+    return Math.max(-1, Math.min(1, v * 3));
+  }
+
+  /** Posição e ângulo de um obstáculo móvel num instante. */
+  moverPose(m: MoverData, t = this.time) {
+    const a = m.phase + m.speed * t;
+    return { x: m.cx + Math.cos(a) * m.orbit, y: m.cy + Math.sin(a) * m.orbit, angle: (m.spin ?? 0) * t + (m.orbit > 0 ? a : 0) };
+  }
+
+  private updateMovers() {
+    const ms = this.zone.movers ?? [];
+    ms.forEach((m, i) => {
+      const b = this.moverBodies[i];
+      const p = this.moverPose(m);
+      // matter 0.20 aceita updateVelocity: o obstáculo transmite seu movimento às pedras
+      (Body.setPosition as (b: Matter.Body, p: Vec, u: boolean) => void)(b, { x: p.x, y: p.y }, true);
+      (Body.setAngle as (b: Matter.Body, a: number, u: boolean) => void)(b, p.angle, true);
+    });
   }
 
   // ------------------------------------------------------------------
@@ -282,6 +332,7 @@ export class Sim {
       return [];
     }
     const a = this.zone.asteroid;
+    const pr = this.planetR();
     const base = target ? Math.atan2(target.y - a.y, target.x - a.x) : -Math.PI / 2 + this.rng.range(-0.6, 0.6);
     const out: Fragment[] = [];
     const ch = this.mods.multiExtractChance;
@@ -292,7 +343,7 @@ export class Sim {
       for (let i = 0; i < 24; i++) {
         const off = ((i + 1) >> 1) * (i % 2 ? 1 : -1) * 0.18;
         const t = ang + off;
-        const p = { x: a.x + Math.cos(t) * (a.r + 7.5), y: a.y + Math.sin(t) * (a.r + 7.5) };
+        const p = { x: a.x + Math.cos(t) * (pr + 7.5), y: a.y + Math.sin(t) * (pr + 7.5) };
         if (this.spawnValid(p, 6.5)) {
           ang = t;
           found = true;
@@ -304,7 +355,7 @@ export class Sim {
         break;
       }
       const n = { x: Math.cos(ang), y: Math.sin(ang) };
-      const p = { x: a.x + n.x * (a.r + 7.5), y: a.y + n.y * (a.r + 7.5) };
+      const p = { x: a.x + n.x * (pr + 7.5), y: a.y + n.y * (pr + 7.5) };
       const spread = this.rng.range(-Config.extractSpread, Config.extractSpread);
       const sp = Config.extractSpeed * this.rng.range(0.9, 1.1);
       const vel = { x: n.x * sp - n.y * spread, y: n.y * sp + n.x * spread };
@@ -387,9 +438,23 @@ export class Sim {
     const a = this.zone.asteroid;
     const h = this.zone.blackHole;
     for (const p of polys) {
-      if (circleOverlapsPoly(a, a.r + 18, p)) return { ok: false, reason: 'Muito perto da fonte' };
+      // o planeta encolhe: nada pode ser construído dentro do raio original
+      if (circleOverlapsPoly(a, a.r + 18, p)) return { ok: false, reason: 'Muito perto do planeta' };
       if (circleOverlapsPoly(h, this.holeAbsorb() + 26, p)) return { ok: false, reason: 'Não pode tapar o buraco negro' };
       for (const nb of this.zone.noBuild) if (circleOverlapsPoly(nb, nb.r, p)) return { ok: false, reason: 'Área proibida' };
+    }
+    const anchors = this.zone.anchors ?? [];
+    if (anchors.length && !anchors.some((an) => polys.every((p) => p.every((q) => Math.hypot(q.x - an.x, q.y - an.y) <= an.r))))
+      return { ok: false, reason: 'Fora das ancoragens' };
+    for (const m of this.zone.movers ?? []) {
+      const local = m.poly.map(([px, py]) => ({ x: px, y: py }));
+      // checa a trajetória inteira do obstáculo (uma volta)
+      const period = Math.abs(m.speed) > 1e-4 ? (Math.PI * 2) / Math.abs(m.speed) : Math.abs(m.spin ?? 0) > 1e-4 ? (Math.PI * 2) / Math.abs(m.spin!) : 1;
+      for (let k = 0; k < 36; k++) {
+        const pose = this.moverPose(m, (k / 36) * period);
+        const world = transformPoly(local, pose, pose.angle);
+        for (const p of polys) if (convexOverlap(p, world, 2)) return { ok: false, reason: 'No caminho de um obstáculo em movimento' };
+      }
     }
     for (const d of this.devices.values()) {
       if (d.id === ignoreId) continue;
@@ -705,6 +770,11 @@ export class Sim {
     const sub = Config.substeps;
     const dtMs = Config.stepMs / sub;
     for (let s = 0; s < sub; s++) {
+      if (this.moverBodies.length) {
+        this.time += dtMs / 1000;
+        this.updateMovers();
+        this.time -= dtMs / 1000;
+      }
       this.applyForces();
       Engine.update(this.engine, dtMs);
       const q = this.queue;
@@ -714,6 +784,7 @@ export class Sim {
     const dt = Config.stepMs / 1000;
     this.time += dt;
     this.frame++;
+    this.syncPlanet();
     this.updateDevices(dt);
     this.updateAutoMine(dt);
     this.postStep(dt);
@@ -803,8 +874,9 @@ export class Sim {
       // campos ambientais agem como força: corpos densos sentem menos
       for (const af of this.zone.fields) {
         if (p.x >= af.x && p.x <= af.x + af.w && p.y >= af.y && p.y <= af.y + af.h) {
-          ax += af.ax / mass;
-          ay += af.ay / mass;
+          const k = this.fieldFactor(af) / (af.gravity ? 1 : mass);
+          ax += af.ax * k;
+          ay += af.ay * k;
         }
       }
 
@@ -1172,7 +1244,7 @@ export class Sim {
 
   isOnAsteroid(p: Vec): boolean {
     const a = this.zone.asteroid;
-    return Math.hypot(p.x - a.x, p.y - a.y) <= a.r + 2;
+    return Math.hypot(p.x - a.x, p.y - a.y) <= this.planetR() + 2;
   }
 
   destroy() {

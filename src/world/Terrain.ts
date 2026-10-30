@@ -16,8 +16,7 @@ export interface ZoneValidation {
 
 /**
  * Regras de engenharia de níveis (GDD §16) que podem ser checadas
- * estaticamente: polígonos convexos, fonte/destino livres de rocha e
- * nenhuma linha reta livre entre a fonte e o buraco negro.
+ * estaticamente: polígonos convexos e fonte/destino livres de rocha.
  */
 export function validateZone(zone: ZoneData): ZoneValidation {
   const errors: string[] = [];
@@ -34,11 +33,9 @@ export function validateZone(zone: ZoneData): ZoneValidation {
       if (Math.hypot(q.x - a.x, q.y - a.y) < a.r - 2) errors.push('vértice de rocha dentro do asteroide');
     }
   }
-  if (!lineOfSightAny(zone, shapes)) {
-    // ok: todas as linhas bloqueadas
-  } else {
-    errors.push('existe linha reta livre entre a fonte e o buraco negro');
-  }
+  // (linhas retas livres não importam mais: o buraco negro flutua no espaço e
+  // quem garante que não há atalho é tools/exploit.ts + o teste "sem peças")
+  for (const m of zone.movers ?? []) if (!isConvex(m.poly.map(([x, y]) => ({ x, y })))) errors.push(`obstáculo ${m.id} não é convexo`);
   if (a.x < 0 || a.x > zone.width || h.x < 0 || h.x > zone.width) errors.push('fonte/destino fora dos limites');
   return { ok: errors.length === 0, errors };
 }

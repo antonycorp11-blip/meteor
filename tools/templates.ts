@@ -131,3 +131,59 @@ TEMPLATES.z5B = {
     { type: 'spring', x: [1201, 1205], y: [696, 696], angle: [0.0, 0.4], params: { power: [8, 10] } },
   ],
 };
+TEMPLATES.n1A = {
+  aim: { x: 330, y: 230 },
+  pace: 50,
+  devices: [
+    { type: 'funnel', x: [270, 380], y: [330, 470], angle: [-0.3, 0.3] },
+    { type: 'spring', x: [270, 400], y: [380, 540], angle: [0.3, 1.1], params: { power: [6, 10] } },
+  ],
+};
+TEMPLATES.n1B = {
+  aim: { x: 330, y: 230 },
+  pace: 50,
+  devices: [
+    { type: 'funnel', x: [270, 380], y: [330, 470], angle: [-0.3, 0.3] },
+    { type: 'spring', x: [270, 400], y: [380, 540], angle: [0.3, 1.1], params: { power: [6, 10] } },
+    { type: 'funnel', x: [620, 900], y: [380, 560], angle: [-0.3, 0.3] },
+    { type: 'spring', x: [620, 900], y: [420, 600], angle: [0.0, 0.9], params: { power: [6, 10] } },
+  ],
+};
+TEMPLATES.n1C = {
+  aim: { x: 330, y: 230 },
+  pace: 55,
+  devices: [
+    { type: 'spring', x: [285, 380], y: [400, 540], angle: [0.2, 1.1], params: { power: [5, 10] } },
+    { type: 'spring', x: [570, 670], y: [415, 438], angle: [0.2, 1.0], params: { power: [6, 10] } },
+  ],
+};
+TEMPLATES.n3A = {
+  aim: { x: 300, y: 200 },
+  pace: 60,
+  devices: [
+    { type: 'spring', x: [355, 380], y: [450, 465], angle: [0.25, 0.4], params: { power: [5.5, 6.5] } },
+    { type: 'spring', x: [470, 570], y: [452, 482], angle: [0.2, 1.1], params: { power: [5, 10] } },
+    { type: 'launcher', x: [840, 920], y: [628, 652], angle: [0.2, 1.0], params: { power: [7, 13] } },
+  ],
+};
+TEMPLATES.n3B = {
+  aim: { x: 300, y: 200 },
+  pace: 60,
+  devices: [
+    { type: 'spring', x: [355, 380], y: [450, 465], angle: [0.25, 0.4], params: { power: [5.5, 6.5] } },
+    { type: 'spring', x: [470, 570], y: [452, 482], angle: [0.2, 1.1], params: { power: [5, 10] } },
+    { type: 'spring', x: [840, 920], y: [630, 655], angle: [0.1, 1.0], params: { power: [6, 10] } },
+    { type: 'spring', x: [1005, 1075], y: [610, 670], angle: [-0.3, 0.6], params: { power: [5, 10] } },
+  ],
+};
+TEMPLATES.n3C = {
+  aim: { x: 300, y: 200 },
+  pace: 60,
+  devices: [
+    { type: 'spring', x: [355, 380], y: [450, 465], angle: [0.25, 0.4], params: { power: [5.5, 6.5] } },
+    { type: 'funnel', x: [480, 560], y: [400, 445], angle: [-0.2, 0.2] },
+    { type: 'launcher', x: [495, 545], y: [452, 480], angle: [0.2, 1.0], params: { power: [5, 11] } },
+    { type: 'funnel', x: [840, 920], y: [580, 625], angle: [-0.2, 0.2] },
+    { type: 'launcher', x: [850, 910], y: [628, 652], angle: [0.2, 1.0], params: { power: [7, 13] } },
+  ],
+};

@@ -55,13 +55,15 @@ Você trabalha para a **Singularis**, empresa que comprou o sistema **Ônix**, c
 
 Cada zona documenta em `src/world/zones/zoneN.json` ao menos duas estratégias automatizadas (mais uma manual), e `tests/zones.test.ts` as simula de verdade no motor físico, além de verificar que sem peças nada chega ao buraco negro. As taxas medidas (entregues/gerados, com ritmo de cliques sustentável):
 
-| Zona | Estratégia A | Estratégia B |
-| --- | --- | --- |
-| 1 | vigas sobre o fosso (~95%) | coletor + placa de pulso (~98%) |
-| 2 | canhão com anteparo (~35–50%) | ponte + acelerador + canhão (~25–35%) |
-| 3 | vigas sobre o poço + canhão (~75–95%) | esteiras + canhão (~60–85%) |
-| 4 | dois canhões de massa: sobre a muralha e do bolso para a câmara (~60–80%) | placas de pulso + vento iônico, só pedras leves (~25–40%) |
-| 5 | três canhões, um por bolsão (~10–30%) | dois canhões + placa de pulso na última muralha (~15–45%) |
+| Planeta | Regra nova | Estratégia A | Estratégia B |
+| --- | --- | --- | --- |
+| I · Cinza | crateras flutuantes | duas placas de pulso (~90%) | duas placas mais inclinadas (~30%) |
+| II · Órion-b | só se constrói nas ancoragens | pulso → canhão → pulso (~40%) | três pulsos, só leves (~10%) |
+| III · Basalto | lâmina giratória e rochas em órbita | pulso, pulso e canhão por baixo da lâmina (~25%) | pulso e dois canhões (~15%) |
+| IV · Íon | correntes que invertem de sentido | três canhões (~20%) | canhão, pulso e canhão (~10%) |
+| V · Horizonte | gravidade por região | pulso para a coluna invertida + canhão (~17%) | dois pulsos (~12%) |
+
+O buraco negro flutua no espaço aberto (nada atrás dele). `tools/exploit.ts` testa centenas de posições de cada peça sozinha: nenhum planeta entrega com uma peça só. A geometria dos planetas é gerada por `tools/levels.py` (crateras em funil, ancoragens, obstáculos móveis, campos).
 
 Ferramentas de desenvolvimento em `tools/`: `simzone.ts` (simula e gera SVG de trajetórias), `optimize.ts` + `templates.ts` (busca de posições), `stageopt.ts` e `sweep.ts` (calibram um estágio por vez), `exploit.ts` (procura atalhos que funcionem com uma peça só), `validate.ts`, e scripts Playwright de captura/interação.
 

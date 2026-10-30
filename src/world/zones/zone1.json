@@ -2,11 +2,11 @@
  "id": 1,
  "key": "limiar",
  "name": "Limiar de Cinzas",
- "subtitle": "Desvio de um paredão em ombro",
+ "subtitle": "Crateras flutuantes e um buraco negro no alto",
  "theme": "ash",
- "intro": "Quebre o asteroide. Alimente o buraco negro.",
- "width": 960,
- "height": 540,
+ "intro": "O buraco negro flutua acima de você. Use as crateras como degraus.",
+ "width": 1200,
+ "height": 680,
  "gravity": {
   "x": 0,
   "y": 1
@@ -14,178 +14,210 @@
  "terrain": [
   [
    [
-    0,
-    150
+    301.4,
+    558.9
    ],
    [
-    26,
-    150
+    308.7,
+    546.9
    ],
    [
-    26,
-    330
+    351.3,
+    573.1
    ],
    [
-    0,
-    330
+    344.0,
+    585.0
    ]
   ],
   [
    [
-    0,
-    330
+    241.0,
+    504
    ],
    [
-    150,
-    330
+    255.0,
+    504
    ],
    [
-    150,
-    540
+    308.7,
+    546.9
    ],
    [
-    0,
-    540
+    298.9,
+    556.7
    ]
   ],
   [
    [
-    150,
-    330
+    351.3,
+    573.1
    ],
    [
-    385,
-    400
+    405.0,
+    504
    ],
    [
-    385,
-    540
+    419.0,
+    504
    ],
    [
-    150,
-    540
+    361.1,
+    582.9
    ]
   ],
   [
    [
-    385,
-    516
+    632.5,
+    441.8
    ],
    [
-    595,
-    516
+    642.6,
+    432.1
    ],
    [
-    595,
-    540
+    677.4,
+    467.9
    ],
    [
-    385,
-    540
+    667.4,
+    477.7
    ]
   ],
   [
    [
-    420,
-    96
+    571.0,
+    394
    ],
    [
-    540,
-    96
+    585.0,
+    394
    ],
    [
-    540,
-    368
+    642.6,
+    432.1
    ],
    [
-    420,
-    368
+    632.8,
+    441.9
    ]
   ],
   [
    [
-    540,
-    150
+    677.4,
+    467.9
    ],
    [
-    585,
-    168
+    735.0,
+    394
    ],
    [
-    585,
-    262
+    749.0,
+    394
    ],
    [
-    540,
-    280
+    687.2,
+    477.7
    ]
   ],
   [
    [
-    595,
-    448
+    787.8,
+    160.8
    ],
    [
-    700,
-    460
+    822.6,
+    144.8
    ],
    [
-    700,
-    540
+    860.8,
+    154.5
    ],
    [
-    595,
-    540
+    871.1,
+    179.0
+   ],
+   [
+    837.9,
+    196.9
+   ],
+   [
+    794.8,
+    187.7
    ]
   ],
   [
    [
-    700,
-    460
+    1031.1,
+    497.6
    ],
    [
-    860,
-    466
+    1048.8,
+    482.5
    ],
    [
-    860,
-    540
+    1085.7,
+    476.6
    ],
    [
-    700,
-    540
+    1123.4,
+    484.4
+   ],
+   [
+    1138.7,
+    502.9
+   ],
+   [
+    1115.3,
+    519.8
+   ],
+   [
+    1074.2,
+    523.8
+   ],
+   [
+    1040.6,
+    514.2
    ]
   ],
   [
    [
-    860,
-    360
+    492.9,
+    290.6
    ],
    [
-    960,
-    360
+    518.0,
+    277.6
    ],
    [
-    960,
-    540
+    547.9,
+    287.0
    ],
    [
-    860,
-    540
+    545.3,
+    308.8
+   ],
+   [
+    521.8,
+    319.5
+   ],
+   [
+    496.1,
+    311.1
    ]
   ]
  ],
  "asteroid": {
-  "x": 130,
-  "y": 236,
-  "r": 40
+  "x": 60,
+  "y": 230,
+  "r": 170
  },
  "blackHole": {
-  "x": 792,
-  "y": 428,
-  "attractRadius": 86,
-  "absorbRadius": 15,
-  "strength": 980
+  "x": 1010,
+  "y": 300,
+  "attractRadius": 90,
+  "absorbRadius": 14,
+  "strength": 1000
  },
  "noBuild": [],
  "fields": [],
@@ -257,64 +289,73 @@
   }
  ],
  "hints": [
-  "Um coletor sob a queda alinha as pedras num ponto só.",
-  "A placa de pulso arremessa na direção da seta: gire até a linha pontilhada encostar no buraco negro.",
-  "Com a mineração automática, o asteroide trabalha sozinho."
+  "Toda pedra que cai numa cratera escorrega até o fundo: ponha ali uma placa de pulso.",
+  "A linha pontilhada mostra o arco: gire a placa até ele cair na próxima cratera.",
+  "Com o drone autônomo, o planeta trabalha sozinho."
  ],
  "solutions": [
   {
    "id": "A",
-   "label": "Canal de vigas sobre o fosso até a encosta",
+   "label": "Placa de pulso na cratera de baixo e outra na cratera do meio",
+   "aim": {
+    "x": 330,
+    "y": 230
+   },
+   "pace": 60,
+   "expectRate": 0.5,
    "devices": [
     {
-     "type": "plank",
-     "x": 418.2,
-     "y": 411.9,
-     "angle": 0.217
-    },
-    {
-     "type": "plank",
-     "x": 482.7,
-     "y": 426.1,
-     "angle": 0.217
-    },
-    {
-     "type": "plank",
-     "x": 547.1,
-     "y": 440.3,
-     "angle": 0.217
-    }
-   ],
-   "expectRate": 0.35
-  },
-  {
-   "id": "B",
-   "label": "Arrasto manual pela abertura e otimização com impulso",
-   "manual": true,
-   "devices": []
-  },
-  {
-   "id": "C",
-   "label": "Coletor no fosso e placa de pulso arremessando direto para o buraco negro",
-   "devices": [
-    {
-     "type": "funnel",
-     "x": 462.8,
-     "y": 462,
-     "angle": -0.15
+     "type": "spring",
+     "x": 335.1,
+     "y": 550.6,
+     "angle": 0.453,
+     "params": {
+      "power": 9.74
+     }
     },
     {
      "type": "spring",
-     "x": 473.3,
-     "y": 478,
-     "angle": 0.561,
+     "x": 665.5,
+     "y": 445.6,
+     "angle": 0.705,
      "params": {
-      "power": 10.37
+      "power": 9.77
      }
     }
-   ],
-   "expectRate": 0.6
+   ]
+  },
+  {
+   "id": "B",
+   "label": "Duas placas de pulso, a segunda mais inclinada",
+   "aim": {
+    "x": 330,
+    "y": 230
+   },
+   "pace": 60,
+   "expectRate": 0.15,
+   "devices": [
+    {
+     "type": "spring",
+     "x": 332,
+     "y": 554,
+     "angle": 0.55,
+     "params": {
+      "power": 9
+     }
+    },
+    {
+     "type": "spring",
+     "x": 663,
+     "y": 444,
+     "angle": 0.8,
+     "params": {
+      "power": 10
+     }
+    }
+   ]
   }
  ],
- "growthTarget": 600
+ "growthTarget": 600,
+ "anchors": [],
+ "movers": []
 }
