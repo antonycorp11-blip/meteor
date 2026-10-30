@@ -255,6 +255,7 @@ export class Game implements GameApi {
     const ps = this.renderer.particles;
     sim.events.on('extract', (e) => {
       this.progress.onExtract(e.frag.id, sim.time);
+      this.renderer.laserShot(e.x, e.y, e.auto);
       if (!e.auto) {
         this.crack = 1;
         this.sfx.crack();
@@ -1048,7 +1049,7 @@ export class Game implements GameApi {
     let k: CursorKind = 'arrow';
     if (this.ptr.kind === 'grab') k = 'clawClosed';
     else if (this.ghost) k = 'arrow';
-    else if (this.ptr.kind === 'extract' || this.hoverAsteroid) k = 'pick';
+    else if (this.ptr.kind === 'extract' || this.hoverAsteroid) k = 'reticle';
     else if (this.hoverFragment >= 0) k = 'clawOpen';
     else if (this.hoverDevice) k = 'hand';
     if (this.lastWasTouch && k === 'arrow') k = 'none';

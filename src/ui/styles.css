@@ -43,7 +43,7 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-/* no PC o cursor é desenhado pelo próprio jogo (picareta, garra…) */
+/* no PC o cursor é desenhado pelo próprio jogo (mira do laser, garra…) */
 body:not(.touch) #game {
   cursor: none;
 }

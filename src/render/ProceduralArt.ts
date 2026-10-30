@@ -1061,7 +1061,6 @@ function fromRows(rows: string[], pal: Record<string, string>, hx: number, hy: n
 
 export interface CursorArt {
   arrow: Sprite;
-  pick: Sprite;
   clawOpen: Sprite;
   clawClosed: Sprite;
   hand: Sprite;
@@ -1077,29 +1076,6 @@ export function cursorArt(): CursorArt {
     pal,
     0,
     0,
-  );
-  // picareta: cabo de madeira na diagonal, cabeça de aço com fio âmbar
-  const pick = fromRows(
-    [
-      '   kkkkk      ',
-      '  kssssskk    ',
-      ' ksgggggssk   ',
-      'kskk  kkgssk  ',
-      'kk      kbgsk ',
-      '        kbbgk ',
-      '       kbdk ks',
-      '      kbdk  kk',
-      '     kbdk     ',
-      '    kbdk      ',
-      '   kbdk       ',
-      '  kbdk        ',
-      ' kbdk         ',
-      'kbdk          ',
-      'kkk           ',
-    ],
-    pal,
-    5,
-    2,
   );
   // garra do feixe: emissor com três dentes
   const clawOpen = fromRows(
@@ -1120,8 +1096,23 @@ export function cursorArt(): CursorArt {
     3,
     1,
   );
-  cursorCache = { arrow, pick, clawOpen, clawClosed, hand };
+  cursorCache = { arrow, clawOpen, clawClosed, hand };
   return cursorCache;
+}
+
+let droneCache: Sprite | null = null;
+
+/** Drone de mineração da Singularis: casco com lente do laser e propulsores. */
+export function droneSprite(): Sprite {
+  if (droneCache) return droneCache;
+  const pal = { k: '#0a0614', s: '#cfd8ec', g: '#7a8aa8', d: '#454a61', c: '#55d7e8', C: '#bff6ff', w: '#ffffff', o: '#ff9a3a', y: '#ffd27a' };
+  droneCache = fromRows(
+    ['   kkkkk   ', '  kssssgk  ', ' ksgcccgdk ', 'kkgcCwCcgkk', 'kokgcCcgkok', 'kykdgggdkyk', ' k kdddk k ', '    kkk    '],
+    pal,
+    5,
+    3,
+  );
+  return droneCache;
 }
 
 let arrowCache: Sprite | null = null;

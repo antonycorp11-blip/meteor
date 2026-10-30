@@ -38,7 +38,7 @@ Stack: TypeScript + Vite + Canvas 2D + Matter.js. Sem servidor, sem assets exter
 
 - Física com Matter.js (passo fixo, subpassos, colisões reais), feixe manual de força limitada, buraco negro com oclusão por rocha e crescimento, terreno indestrutível validado.
 - Arte 100% procedural em pixel art: paredes como aglomerados de meteoros com veios de magma, asteroide com minério pulsante, disco de acreção animado, fundo vivo (estrelas cintilantes, meteoros e estrelas cadentes, planeta girando com lua, galáxia, nebulosa à deriva), bloom aditivo e vinheta.
-- Cursores próprios no PC: picareta que golpeia no asteroide, garra que abre sobre uma pedra e fecha ao segurar.
+- Mineração a laser: um drone orbita o asteroide e dispara onde você mira; cursores próprios no PC (mira que se fecha no disparo, garra que abre sobre uma pedra e fecha ao segurar).
 - Colapso final animado (o buraco negro engole o mapa) e tela "Supermassivo!".
 - Interface com molduras pixel 9-slice, fonte Silkscreen nos títulos e Inter nos números (OFL, empacotadas), barra de construção à esquerda com fichas explicativas, HUD com barra do buraco negro e medidor de calor, tela de título com cena própria.
 - Música original procedural (Web Audio) e efeitos sintetizados; save com migração (v3) e cópia de segurança; controles PC e toque em paisagem.

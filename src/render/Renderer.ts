@@ -11,6 +11,7 @@ import { drawPixelText, textWidth } from './PixelFont';
 import {
   arrowSprite,
   cursorArt,
+  droneSprite,
   deviceArt,
   fragmentGlowColor,
   makeAsteroid,
@@ -52,14 +53,14 @@ export interface Handle {
   r: number;
 }
 
-export type CursorKind = 'arrow' | 'pick' | 'clawOpen' | 'clawClosed' | 'hand' | 'none';
+export type CursorKind = 'arrow' | 'reticle' | 'clawOpen' | 'clawClosed' | 'hand' | 'none';
 
 export interface CursorState {
   /** posição em px de buffer */
   x: number;
   y: number;
   kind: CursorKind;
-  /** 0..1: animação de golpe da picareta */
+  /** 0..1: animação de disparo da mira */
   swing: number;
   visible: boolean;
 }
@@ -132,6 +133,8 @@ export class Renderer {
   private meteors: Meteor[] = [];
   private nextMeteor = 1;
   private frame = 0;
+  private drone = { ang: -Math.PI / 2 - 0.6, target: -Math.PI / 2 - 0.6, bob: 0 };
+  private shots: { x: number; y: number; life: number; max: number; auto: boolean }[] = [];
   private titleOrbit: { a: number; r: number; w: number; c: string; s: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
@@ -311,6 +314,7 @@ export class Renderer {
     if (!zone || !this.terrain || !this.asteroid || !this.hole || !this.bg) return;
     this.frame++;
     this.particles.update(dt);
+    this.updateDrone(dt, s.time);
     const ctx = this.bctx;
     const cam = this.camera;
     const W = this.buffer.width;
@@ -424,6 +428,8 @@ export class Renderer {
       const ang = Math.random() * Math.PI * 2;
       this.particles.spawn({ x: a.x + Math.cos(ang) * a.r * 0.8, y: a.y + Math.sin(ang) * a.r * 0.8, vx: (Math.random() - 0.5) * 6, vy: -8 - Math.random() * 8, life: 1.6, color: Math.random() < 0.5 ? '#ff8a2a' : PAL.core, size: 1, gravity: -4 });
     }
+
+    this.drawDrone(s, z, tx, ty, Math.max(0, 1 - col * 1.6));
 
     // --- dispositivos
     for (const d of s.sim.devices.values()) this.drawDevice(d, z, tx, ty, s.time, d.enabled ? 1 - col : 0.5 - col);
@@ -873,20 +879,13 @@ export class Renderer {
   private drawCursor(c: CursorState, time: number) {
     if (!c.visible || c.kind === 'none') return;
     const art = cursorArt();
-    const spr = art[c.kind];
     const s = this.ui();
     const ctx = this.bctx;
-    if (c.kind === 'pick') {
-      // golpe: a picareta gira para trás e desce
-      const sw = c.swing;
-      const ang = sw > 0 ? (sw > 0.5 ? -0.9 * (1 - (sw - 0.5) * 2) : -0.9 * (sw * 2)) : Math.sin(time * 3) * 0.06;
-      const ca = Math.cos(ang);
-      const sa = Math.sin(ang);
-      ctx.setTransform(s * ca, s * sa, -s * sa, s * ca, Math.round(c.x), Math.round(c.y));
-      ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (c.kind === 'reticle') {
+      this.drawReticle(c, time);
       return;
     }
+    const spr = art[c.kind];
     let ox = 0;
     let oy = 0;
     if (c.kind === 'clawOpen') oy = Math.round(Math.sin(time * 6) * 1);
@@ -897,6 +896,107 @@ export class Renderer {
       // anéis de energia em volta da garra
       const r = 9 * s + Math.sin(time * 14) * s;
       this.ringPx(c.x, c.y + 2 * s, r, 'rgba(85,215,232,0.85)', 14);
+    }
+  }
+
+  /** Mira de mineração: cantoneiras que se fecham no disparo, ponto âmbar no centro. */
+  private drawReticle(c: CursorState, time: number) {
+    const ctx = this.bctx;
+    const u = this.ui();
+    const cx = Math.round(c.x);
+    const cy = Math.round(c.y);
+    const d = Math.round((6 + Math.sin(time * 4) * 0.6 - c.swing * 2.5) * u);
+    const L = 3 * u;
+    const corner = (sx: number, sy: number, col: string, grow: number) => {
+      const x = cx + sx * d;
+      const y = cy + sy * d;
+      ctx.fillStyle = col;
+      ctx.fillRect(sx > 0 ? x - L - grow : x - grow, y - grow, L + grow * 2, u + grow * 2);
+      ctx.fillRect(x - grow, sy > 0 ? y - L - grow : y - grow, u + grow * 2, L + grow * 2);
+    };
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) corner(sx, sy, '#0a0614', u);
+    const col = c.swing > 0.4 ? '#ffffff' : '#55d7e8';
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) corner(sx, sy, col, 0);
+    ctx.fillStyle = '#0a0614';
+    ctx.fillRect(cx - u, cy - u, u * 3, u * 3);
+    ctx.fillStyle = c.swing > 0.4 ? '#ffffff' : '#ffd27a';
+    ctx.fillRect(cx, cy, u, u);
+  }
+
+  /** Disparo do laser do drone até um ponto da superfície do asteroide. */
+  laserShot(x: number, y: number, auto: boolean) {
+    const a = this.zone?.asteroid;
+    if (!a) return;
+    const ang = Math.atan2(y - a.y, x - a.x);
+    this.drone.target = ang;
+    this.shots.push({ x: a.x + Math.cos(ang) * a.r * 0.92, y: a.y + Math.sin(ang) * a.r * 0.92, life: auto ? 0.16 : 0.22, max: auto ? 0.16 : 0.22, auto });
+    if (this.shots.length > 4) this.shots.shift();
+  }
+
+  private updateDrone(dt: number, time: number) {
+    const d = this.drone;
+    let diff = d.target - d.ang;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    d.ang += diff * Math.min(1, dt * 7);
+    // à deriva quando ocioso
+    d.target += dt * 0.12;
+    d.bob = Math.sin(time * 2.6) * 1.5;
+    for (const sh of this.shots) sh.life -= dt;
+    this.shots = this.shots.filter((sh) => sh.life > 0);
+  }
+
+  private dronePos(): Vec {
+    const a = this.zone!.asteroid;
+    const r = a.r + 24;
+    return { x: a.x + Math.cos(this.drone.ang) * r, y: a.y + Math.sin(this.drone.ang) * r + this.drone.bob };
+  }
+
+  private drawDrone(s: RenderState, z: number, tx: number, ty: number, fade: number) {
+    if (fade <= 0) return;
+    const ctx = this.bctx;
+    const p = this.dronePos();
+    const u = this.ui();
+    // feixes
+    if (this.shots.length) {
+      const b0 = this.camera.toBuffer(p.x, p.y);
+      this.additive(() => {
+        for (const sh of this.shots) {
+          const k = sh.life / sh.max;
+          const b1 = this.camera.toBuffer(sh.x, sh.y);
+          const len = Math.hypot(b1.x - b0.x, b1.y - b0.y);
+          const n = Math.max(2, Math.ceil(len / u));
+          const w = Math.max(1, Math.round((sh.auto ? 1 : 2) * u * (0.6 + k * 0.6)));
+          ctx.globalAlpha = Math.min(1, k * 1.6) * fade;
+          for (let i = 0; i <= n; i++) {
+            const t = i / n;
+            const x = b0.x + (b1.x - b0.x) * t;
+            const y = b0.y + (b1.y - b0.y) * t;
+            ctx.fillStyle = sh.auto ? '#ff9a3a' : '#55d7e8';
+            ctx.fillRect(Math.round(x - w), Math.round(y - w), w * 2 + 1, w * 2 + 1);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(Math.round(x - w / 2), Math.round(y - w / 2), Math.max(1, w), Math.max(1, w));
+          }
+          const sz = (sh.auto ? 18 : 30) * z * (0.5 + k);
+          ctx.drawImage(this.glowSprite(sh.auto ? '#ff9a3a' : '#bff6ff'), b1.x - sz / 2, b1.y - sz / 2, sz, sz);
+          ctx.drawImage(this.glowSprite('#55d7e8'), b0.x - sz / 3, b0.y - sz / 3, (sz * 2) / 3, (sz * 2) / 3);
+        }
+      });
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    const spr = droneSprite();
+    const a = this.zone!.asteroid;
+    const face = Math.atan2(a.y - p.y, a.x - p.x) - Math.PI / 2;
+    const ca = Math.cos(face);
+    const sa = Math.sin(face);
+    ctx.globalAlpha = fade;
+    ctx.setTransform(z * ca, z * sa, -z * sa, z * ca, tx + z * p.x, ty + z * p.y);
+    ctx.drawImage(spr.canvas, -spr.ox, -spr.oy);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    // chama dos propulsores
+    if (this.frame % 3 === 0 && this.particles.pool.length < this.particles.cap * 0.6) {
+      const back = { x: -Math.cos(face + Math.PI / 2), y: -Math.sin(face + Math.PI / 2) };
+      this.particles.spawn({ x: p.x + back.x * 4, y: p.y + back.y * 4, vx: back.x * 14 + (Math.random() - 0.5) * 6, vy: back.y * 14 + (Math.random() - 0.5) * 6, life: 0.35, color: Math.random() < 0.5 ? '#ff9a3a' : '#ffd27a', size: 1, gravity: 0 });
     }
   }
 

@@ -107,8 +107,11 @@ export class SfxEngine {
     const ctx = this.ok('crack');
     if (!ctx) return;
     const t = ctx.currentTime;
-    this.noiseHit(ctx, t, 0.09, 0.32, 'bandpass', this.jitter(1300), 700, 1.1);
-    this.tone(ctx, 'triangle', this.jitter(880), 620, t, 0.08, 0.07);
+    // zap do laser seguido do estalo da rocha
+    this.tone(ctx, 'sawtooth', this.jitter(2400), 900, t, 0.07, 0.035);
+    this.tone(ctx, 'square', this.jitter(1600), 1200, t, 0.05, 0.02);
+    this.noiseHit(ctx, t + 0.015, 0.09, 0.3, 'bandpass', this.jitter(1300), 700, 1.1);
+    this.tone(ctx, 'triangle', this.jitter(880), 620, t, 0.08, 0.06);
     this.tone(ctx, 'sine', 150, 60, t, 0.12, 0.22);
     this.track(0.15);
   }
